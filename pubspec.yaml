@@ -1,0 +1,15 @@
+name: anyio
+description: "AnyIO"
+publish_to: 'none'
+# repository: https://github.com/my_org/my_repo
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.0
+
+workspace:
+  - packages/dart_modbus_slave
+
+dev_dependencies:
+  melos: ^7.0.0-dev
