@@ -1,0 +1,20 @@
+name: anyio_template
+description: "AnyIO"
+publish_to: 'none'
+# repository: https://github.com/my_org/my_repo
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.7.0
+
+resolution: workspace
+
+dependencies:
+  freezed_annotation: ^3.0.0
+
+dev_dependencies:
+  build_runner: any
+  freezed: any
+  lints: any
+  very_good_analysis: any

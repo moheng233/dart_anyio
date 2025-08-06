@@ -9,7 +9,8 @@ environment:
   sdk: ^3.7.0
 
 workspace:
-  - packages/dart_modbus_slave
+  - packages/template
+  - packages/dart_modbus
 
 dev_dependencies:
   melos: ^7.0.0-dev

@@ -5,3 +5,5 @@ library;
 
 export 'src/frame.dart';
 export 'src/transformer.dart';
+export 'src/transformers/rtu.dart';
+export 'src/transformers/tcp.dart';
