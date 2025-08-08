@@ -1,4 +1,4 @@
-name: anyio_template
+name: json_rpc_builder
 description: "AnyIO"
 publish_to: 'none'
 # repository: https://github.com/my_org/my_repo
@@ -11,13 +11,16 @@ environment:
 resolution: workspace
 
 dependencies:
-  freezed_annotation: ^3.0.0
+  json_rpc_annotation: ^1.0.0
+  code_builder: ^4.10.1
   json_annotation: ^4.9.0
-  path: ^1.9.1
+  source_gen: ^3.0.0
+  analyzer: ^7.7.1
+  build: ^3.0.1
+  dart_style: ^3.1.1
+
 
 dev_dependencies:
   build_runner: any
-  freezed: any
-  json_serializable: ^6.10.0
-  lints: any
+  json_serializable: any
   very_good_analysis: any

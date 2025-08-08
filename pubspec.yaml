@@ -6,11 +6,16 @@ publish_to: 'none'
 version: 1.0.0+1
 
 environment:
-  sdk: ^3.7.0
+  sdk: ^3.8.0
 
 workspace:
+  - packages/json_rpc_annotation
+  - packages/json_rpc_builder
+  - packages/protocol
   - packages/template
+  - packages/service
   - packages/dart_modbus
 
 dev_dependencies:
   melos: ^7.0.0-dev
+  very_good_analysis: any

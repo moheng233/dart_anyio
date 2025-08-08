@@ -1,13 +1,15 @@
+// ignore_for_file: avoid_positional_boolean_parameters 统一字段名称需要
+
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 part 'frame.freezed.dart';
 
 /// Modbus异常类
 class ModbusException implements Exception {
+  const ModbusException(this.message, [this.details]);
+
   final String message;
   final String? details;
-
-  const ModbusException(this.message, [this.details]);
 
   @override
   String toString() => details != null
@@ -175,7 +177,8 @@ extension WriteMultipleCoilsRequestExtension on WriteMultipleCoilsRequest {
   }
 }
 
-extension WriteMultipleRegistersRequestExtension on WriteMultipleRegistersRequest {
+extension WriteMultipleRegistersRequestExtension
+    on WriteMultipleRegistersRequest {
   WriteMultipleRegistersResponse response() {
     return WriteMultipleRegistersResponse(startAddress, values.length);
   }
