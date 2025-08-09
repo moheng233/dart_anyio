@@ -1,0 +1,16 @@
+name: json_rpc_runtime
+description: "AnyIO"
+publish_to: 'none'
+# repository: https://github.com/my_org/my_repo
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+resolution: workspace
+
+dev_dependencies:
+  very_good_analysis: any
+dependencies:
+  json_rpc_2: ^4.0.0

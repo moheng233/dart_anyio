@@ -11,13 +11,14 @@ environment:
 resolution: workspace
 
 dependencies:
-  json_rpc_annotation: ^1.0.0
-  code_builder: ^4.10.1
-  json_annotation: ^4.9.0
-  source_gen: ^3.0.0
   analyzer: ^7.7.1
   build: ^3.0.1
+  built_collection: ^5.1.1
+  code_builder: ^4.10.1
   dart_style: ^3.1.1
+  json_annotation: ^4.9.0
+  json_rpc_annotation: ^1.0.0
+  source_gen: ^3.0.0
 
 
 dev_dependencies:

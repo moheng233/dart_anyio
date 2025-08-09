@@ -11,6 +11,7 @@ environment:
 workspace:
   - packages/json_rpc_annotation
   - packages/json_rpc_builder
+  - packages/json_rpc_runtime
   - packages/protocol
   - packages/template
   - packages/service

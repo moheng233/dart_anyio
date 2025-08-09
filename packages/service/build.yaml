@@ -7,5 +7,3 @@ targets:
           any_map: true
           field_rename: snake
           disallow_unrecognized_keys: true
-          create_field_map: true
-          create_json_keys: true

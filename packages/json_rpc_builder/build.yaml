@@ -1,8 +1,9 @@
 builders:
   json_rpc_builder:
     import: "package:json_rpc_builder/builder.dart"
-    builder_factories: ["jsonRcpBuilder"]
-    build_extensions: {".dart": [".json_rpc_builder.g.part"]}
+    builder_factories: ["jsonRpcBuilder"]
+    build_extensions: { ".dart": [".rpc.dart"] }
     auto_apply: dependents
-    build_to: cache
-    applies_builders: ["source_gen:combining_builder"]
+    build_to: source
+    runs_before:
+      - "json_serializable:json_serializable"
