@@ -35,10 +35,10 @@ final class JsonRpcResponeModelGenerator extends BaseModelGenerator {
       (b) => b
         ..name = getResponeModelName(method.displayName)
         ..modifier = ClassModifier.final$
-        ..annotations = ListBuilder([
+        ..annotations.add(
           const InvokeExpression.newOf(jsonSerializableReference, []),
-        ])
-        ..fields = ListBuilder([
+        )
+        ..fields.addAll([
           for (int i = 0; i < fieldTypes.length; i++)
             Field(
               (b) => b
@@ -47,7 +47,7 @@ final class JsonRpcResponeModelGenerator extends BaseModelGenerator {
                 ..modifier = FieldModifier.final$,
             ),
         ])
-        ..constructors = ListBuilder([
+        ..constructors.add(
           Constructor(
             (b) => b
               ..constant = true
@@ -60,6 +60,8 @@ final class JsonRpcResponeModelGenerator extends BaseModelGenerator {
                   ),
               ]),
           ),
+        )
+        ..constructors.add(
           Constructor(
             (b) => b
               ..name = 'fromJson'
@@ -76,8 +78,8 @@ final class JsonRpcResponeModelGenerator extends BaseModelGenerator {
                 '_\$${normalizeElementName(method.displayName)}ResponeFromJson',
               ).call([const Reference('json')]).code,
           ),
-        ])
-        ..methods = ListBuilder([
+        )
+        ..methods.add(
           Method(
             (b) => b
               ..name = 'toJson'
@@ -87,7 +89,7 @@ final class JsonRpcResponeModelGenerator extends BaseModelGenerator {
                 '_\$${normalizeElementName(method.displayName)}ResponeToJson',
               ).call([const Reference('this')]).code,
           ),
-        ]),
+        ),
     );
   }
 

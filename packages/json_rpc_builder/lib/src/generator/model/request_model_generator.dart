@@ -17,7 +17,7 @@ final class JsonRpcRequestModelGenerator extends BaseModelGenerator {
 
     return Class(
       (b) => b
-        ..name = getRequstModelName(method.displayName)
+        ..name = '_${getRequstModelName(method.displayName)}'
         ..modifier = ClassModifier.final$
         ..annotations = ListBuilder([
           const InvokeExpression.newOf(jsonSerializableReference, []),
@@ -31,7 +31,7 @@ final class JsonRpcRequestModelGenerator extends BaseModelGenerator {
                 ..modifier = FieldModifier.final$,
             ),
         ])
-        ..constructors = ListBuilder(<Constructor>[
+        ..constructors.add(
           Constructor(
             (b) => b
               ..constant = true
@@ -44,6 +44,8 @@ final class JsonRpcRequestModelGenerator extends BaseModelGenerator {
                   ),
               ]),
           ),
+        )
+        ..constructors.add(
           Constructor(
             (b) => b
               ..name = 'fromJson'
@@ -57,10 +59,21 @@ final class JsonRpcRequestModelGenerator extends BaseModelGenerator {
               ])
               ..lambda = true
               ..body = Reference(
-                '_\$${normalizeElementName(method.displayName)}RequestFromJson',
+                '_\$${getRequstModelName(method.displayName)}FromJson',
               ).call([const Reference('json')]).code,
           ),
-        ]),
+        )
+        ..methods.add(
+          Method(
+            (b) => b
+              ..name = 'toJson'
+              ..returns = jsonMapReference
+              ..lambda = true
+              ..body = Reference(
+                '_\$${getRequstModelName(method.displayName)}ToJson',
+              ).call([const Reference('this')]).code,
+          ),
+        ),
     );
   }
 }

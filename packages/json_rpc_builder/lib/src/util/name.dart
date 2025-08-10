@@ -16,9 +16,19 @@ String normalizeSeviceName(String name) {
 }
 
 String getRequstModelName(String name) {
-  return '_${normalizeElementName(name)}Request';
+  return '${toPascalCase(normalizeElementName(name))}Request';
 }
 
 String getResponeModelName(String name) {
-  return '_${normalizeElementName(name)}Respone';
+  return '${toPascalCase(normalizeElementName(name))}Respone';
+}
+
+String toPascalCase(String input) {
+  if (input.isEmpty) return input;
+  final parts = input.split(RegExp(r'[_\-\s]+'));
+  return parts.map((part) {
+    if (part.isEmpty) return '';
+    final lower = part.toLowerCase();
+    return lower[0].toUpperCase() + lower.substring(1);
+  }).join();
 }

@@ -22,4 +22,7 @@ abstract interface class _TestSercice {
 
   @JsonRpcMethod()
   Test2Respone _test2();
+
+  @JsonRpcMethod()
+  Future<int> _test3();
 }

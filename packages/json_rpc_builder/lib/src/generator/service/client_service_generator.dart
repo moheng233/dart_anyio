@@ -6,6 +6,8 @@ import 'package:source_gen/source_gen.dart';
 
 import '../../util/name.dart';
 
+const _jsonRpcClientBaseReference = Reference('IJsonRpcClient');
+
 final class JsonRpcClientGenerator
     extends GeneratorForAnnotation<JsonRpcService> {
   final emitter = DartEmitter(
@@ -22,10 +24,13 @@ final class JsonRpcClientGenerator
       final classes = Class(
         (b) => b
           ..name = '${normalizeSeviceName(element.displayName)}Client'
-          ..modifier = ClassModifier.final$,
+          ..modifier = ClassModifier.final$
+          ..extend = _jsonRpcClientBaseReference,
       );
 
       return emitter.visitClass(classes).toString();
     }
+
+    return null;
   }
 }

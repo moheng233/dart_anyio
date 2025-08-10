@@ -48,7 +48,7 @@ final class JsonRpcServerGenerator
           ..implements.add(Reference(element.displayName))
           ..implements.add(
             const Reference(
-              'IJsonRpcService',
+              'IJsonRpcServer',
               'package:json_rpc_runtime/runtime.dart',
             ),
           )
@@ -151,7 +151,7 @@ final class JsonRpcServerGenerator
                             ).assign(
                               InvokeExpression.newOf(
                                 Reference(
-                                  getRequstModelName(method.displayName),
+                                  '_${getRequstModelName(method.displayName)}',
                                 ),
                                 [const Reference('request').property('asMap')],
                                 {},
