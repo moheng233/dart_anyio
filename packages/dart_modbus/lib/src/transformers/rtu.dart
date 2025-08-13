@@ -98,9 +98,9 @@ class ModbusRtuRequestParser
 /// Modbus RTU请求序列化器
 /// 将ModbusRequestPacket转换为RTU字节流
 class ModbusRtuRequestSerializer
-    extends StreamTransformerBase<ModbusRequestPacket, Uint8List> {
+    extends StreamTransformerBase<ModbusRequestPacket, List<int>> {
   @override
-  Stream<Uint8List> bind(Stream<ModbusRequestPacket> stream) async* {
+  Stream<List<int>> bind(Stream<ModbusRequestPacket> stream) async* {
     await for (final packet in stream) {
       // 只处理RTU包（没有transactionId的包）
       if (packet.transactionId == null) {
@@ -115,7 +115,7 @@ class ModbusRtuRequestSerializer
   }
 
   /// 序列化RTU请求为字节数组
-  Uint8List serializeRtuRequest(
+  List<int> serializeRtuRequest(
     ModbusPDURequest request,
     int unitId,
   ) {
@@ -123,7 +123,7 @@ class ModbusRtuRequestSerializer
   }
 
   /// 序列化RTU请求为字节数组（内部实现）
-  Uint8List _serializeRtuRequest(
+  List<int> _serializeRtuRequest(
     ModbusPDURequest request,
     int unitId,
   ) {

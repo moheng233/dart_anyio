@@ -60,9 +60,9 @@ class ModbusTcpRequestParser
 /// Modbus TCP请求序列化器
 /// 将ModbusRequestPacket转换为TCP字节流
 class ModbusTcpRequestSerializer
-    extends StreamTransformerBase<ModbusRequestPacket, Uint8List> {
+    extends StreamTransformerBase<ModbusRequestPacket, List<int>> {
   @override
-  Stream<Uint8List> bind(Stream<ModbusRequestPacket> stream) async* {
+  Stream<List<int>> bind(Stream<ModbusRequestPacket> stream) async* {
     await for (final packet in stream) {
       // 只处理TCP包（有transactionId的包）
       if (packet.transactionId != null) {
@@ -99,15 +99,14 @@ class ModbusTcpRequestSerializer
     final buffer = Uint8List(
       6 + requestDataLength,
     ); // Header + unitId + fcode + data
-    final view =
-        ByteData.view(buffer.buffer)
-          // MBAP Header
-          ..setUint16(0, transactionId)
-          ..setUint16(2, 0) // Protocol identifier
-          ..setUint16(4, requestDataLength) // Length field
-          // PDU
-          ..setUint8(6, unitId)
-          ..setUint8(7, _getRequestFunctionCode(request));
+    final view = ByteData.view(buffer.buffer)
+      // MBAP Header
+      ..setUint16(0, transactionId)
+      ..setUint16(2, 0) // Protocol identifier
+      ..setUint16(4, requestDataLength) // Length field
+      // PDU
+      ..setUint8(6, unitId)
+      ..setUint8(7, _getRequestFunctionCode(request));
 
     _fillRequestData(view, request, 8);
     return buffer;
@@ -193,12 +192,12 @@ class ModbusTcpRequestSerializer
   /// 将线圈布尔值打包成字节
   void _packCoilsToBytes(ByteData view, List<bool> coils, int offset) {
     final byteCount = (coils.length + 7) ~/ 8;
-    for (int byteIndex = 0; byteIndex < byteCount; byteIndex++) {
-      int byte = 0;
-      for (int bitIndex = 0; bitIndex < 8; bitIndex++) {
+    for (var byteIndex = 0; byteIndex < byteCount; byteIndex++) {
+      var byte = 0;
+      for (var bitIndex = 0; bitIndex < 8; bitIndex++) {
         final coilIndex = byteIndex * 8 + bitIndex;
         if (coilIndex < coils.length && coils[coilIndex]) {
-          byte |= (1 << bitIndex);
+          byte |= 1 << bitIndex;
         }
       }
       view.setUint8(offset + byteIndex, byte);
@@ -276,11 +275,10 @@ class ModbusTcpResponseParser
       0x06 => _parseSingleRegisterResponse(data), // WriteSingleRegister
       0x0F => _parseMultipleCoilsResponse(data), // WriteMultipleCoils
       0x10 => _parseMultipleRegistersResponse(data), // WriteMultipleRegisters
-      _ =>
-        throw ModbusException(
-          'Unsupported function code',
-          'Function code 0x${functionCode.toRadixString(16)} is not supported',
-        ),
+      _ => throw ModbusException(
+        'Unsupported function code',
+        'Function code 0x${functionCode.toRadixString(16)} is not supported',
+      ),
     };
   }
 
@@ -290,9 +288,9 @@ class ModbusTcpResponseParser
     final coilData = data.sublist(1, 1 + byteCount);
     final coils = <bool>[];
 
-    for (int byteIndex = 0; byteIndex < byteCount; byteIndex++) {
+    for (var byteIndex = 0; byteIndex < byteCount; byteIndex++) {
       final byte = coilData[byteIndex];
-      for (int bitIndex = 0; bitIndex < 8; bitIndex++) {
+      for (var bitIndex = 0; bitIndex < 8; bitIndex++) {
         coils.add((byte & (1 << bitIndex)) != 0);
       }
     }
@@ -306,9 +304,9 @@ class ModbusTcpResponseParser
     final inputData = data.sublist(1, 1 + byteCount);
     final inputs = <bool>[];
 
-    for (int byteIndex = 0; byteIndex < byteCount; byteIndex++) {
+    for (var byteIndex = 0; byteIndex < byteCount; byteIndex++) {
       final byte = inputData[byteIndex];
-      for (int bitIndex = 0; bitIndex < 8; bitIndex++) {
+      for (var bitIndex = 0; bitIndex < 8; bitIndex++) {
         inputs.add((byte & (1 << bitIndex)) != 0);
       }
     }
@@ -322,7 +320,7 @@ class ModbusTcpResponseParser
     final registerData = data.sublist(1, 1 + byteCount);
     final registers = <int>[];
 
-    for (int i = 0; i < byteCount; i += 2) {
+    for (var i = 0; i < byteCount; i += 2) {
       registers.add(ByteData.view(registerData.buffer).getUint16(i));
     }
 
@@ -335,7 +333,7 @@ class ModbusTcpResponseParser
     final registerData = data.sublist(1, 1 + byteCount);
     final registers = <int>[];
 
-    for (int i = 0; i < byteCount; i += 2) {
+    for (var i = 0; i < byteCount; i += 2) {
       registers.add(ByteData.view(registerData.buffer).getUint16(i));
     }
 
@@ -378,7 +376,7 @@ class ModbusTcpResponseParser
 /// Modbus TCP响应序列化器
 /// 将ModbusResponsePacket转换为TCP字节流
 class ModbusTcpResponseSerializer
-    extends StreamTransformerBase<ModbusResponsePacket, Uint8List> {
+    extends StreamTransformerBase<ModbusResponsePacket, List<int>> {
   @override
   Stream<Uint8List> bind(Stream<ModbusResponsePacket> stream) async* {
     await for (final packet in stream) {
@@ -417,15 +415,14 @@ class ModbusTcpResponseSerializer
         ModbusPduProcessor.calculateResponseDataLength(response) +
         2; // +2 for unitId and functionCode
     final buffer = Uint8List(6 + dataLength); // Header + unitId + fcode + data
-    final view =
-        ByteData.view(buffer.buffer)
-          // MBAP Header
-          ..setUint16(0, transactionId)
-          ..setUint16(2, 0) // Protocol identifier
-          ..setUint16(4, dataLength) // Length field
-          // PDU
-          ..setUint8(6, unitId)
-          ..setUint8(7, ModbusPduProcessor.getFunctionCode(response));
+    final view = ByteData.view(buffer.buffer)
+      // MBAP Header
+      ..setUint16(0, transactionId)
+      ..setUint16(2, 0) // Protocol identifier
+      ..setUint16(4, dataLength) // Length field
+      // PDU
+      ..setUint8(6, unitId)
+      ..setUint8(7, ModbusPduProcessor.getFunctionCode(response));
 
     ModbusPduProcessor.fillResponseData(view, response, 8);
     return buffer;

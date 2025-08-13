@@ -17,7 +17,7 @@ Builder jsonRpcBuilder(BuilderOptions options) {
     '.rpc.dart',
     options: options,
     header: <String>[
-      '// ignore_for_file: non_constant_identifier_names',
+      '// ignore_for_file: non_constant_identifier_names, unnecessary_parenthesis',
     ].join('\n'),
   );
 }

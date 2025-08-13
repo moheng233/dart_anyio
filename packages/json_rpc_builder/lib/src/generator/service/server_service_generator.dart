@@ -14,14 +14,6 @@ import '../../util/type.dart';
 
 final class JsonRpcServerGenerator
     extends GeneratorForAnnotation<JsonRpcService> {
-  static const jsonSerializableChecker = TypeChecker.fromRuntime(
-    JsonSerializable,
-  );
-
-  static const jsonRpcMethodChecker = TypeChecker.fromUrl(
-    'package:json_rpc_annotation/annotation.dart#JsonRpcMethod',
-  );
-
   final emitter = DartEmitter(
     useNullSafetySyntax: true,
   );

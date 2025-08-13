@@ -9,13 +9,14 @@ environment:
   sdk: ^3.8.0
 
 workspace:
+  - packages/dart_modbus
   - packages/json_rpc_annotation
   - packages/json_rpc_builder
   - packages/json_rpc_runtime
   - packages/protocol
   - packages/template
   - packages/service
-  - packages/dart_modbus
+  - packages/adapter_modbus
 
 dev_dependencies:
   melos: ^7.0.0-dev

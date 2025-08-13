@@ -2,6 +2,10 @@ import 'package:built_collection/built_collection.dart';
 import 'package:code_builder/code_builder.dart';
 import 'package:source_gen/source_gen.dart';
 
+const jsonSerializableChecker = TypeChecker.fromUrl(
+  'package:json_annotation/src/json_serializable.dart#JsonSerializable',
+);
+
 const jsonRpcMethodChecker = TypeChecker.fromUrl(
   'package:json_rpc_annotation/annotation.dart#JsonRpcMethod',
 );

@@ -3,6 +3,7 @@ import 'package:built_collection/built_collection.dart';
 import 'package:code_builder/code_builder.dart';
 
 import '../../util/const.dart';
+import '../../util/element.dart';
 import '../../util/name.dart';
 import 'base_model_generator.dart';
 
@@ -17,7 +18,7 @@ final class JsonRpcRequestModelGenerator extends BaseModelGenerator {
 
     return Class(
       (b) => b
-        ..name = '_${getRequstModelName(method.displayName)}'
+        ..name = getRequstModelName(method.displayName, withPrive: true)
         ..modifier = ClassModifier.final$
         ..annotations = ListBuilder([
           const InvokeExpression.newOf(jsonSerializableReference, []),
@@ -27,7 +28,7 @@ final class JsonRpcRequestModelGenerator extends BaseModelGenerator {
             Field(
               (b) => b
                 ..name = parameter.name3
-                ..type = Reference(parameter.type.getDisplayString())
+                ..type = parameter.type.reference
                 ..modifier = FieldModifier.final$,
             ),
         ])
@@ -35,11 +36,13 @@ final class JsonRpcRequestModelGenerator extends BaseModelGenerator {
           Constructor(
             (b) => b
               ..constant = true
-              ..requiredParameters = ListBuilder(<Parameter>[
+              ..optionalParameters = ListBuilder(<Parameter>[
                 for (final parameter in method.formalParameters)
                   Parameter(
                     (b) => b
                       ..name = parameter.displayName
+                      ..named = true
+                      ..required = parameter.isRequired
                       ..toThis = true,
                   ),
               ]),

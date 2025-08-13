@@ -22,13 +22,13 @@ sealed class ModbusPacket with _$ModbusPacket {
   const factory ModbusPacket.request(
     int unitId,
     ModbusPDURequest pdu,
-    int? transactionId,
+    [int? transactionId]
   ) = ModbusRequestPacket;
 
   const factory ModbusPacket.respone(
     int unitId,
     ModbusPDUResponse pdu,
-    int? transactionId,
+    [int? transactionId]
   ) = ModbusResponsePacket;
 }
 
