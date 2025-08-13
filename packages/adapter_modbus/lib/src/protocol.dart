@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:anyio_modbus/modbus_client.dart';
 import 'package:anyio_template/service.dart';
@@ -27,6 +25,8 @@ final class ChannelSessionForModbus
         (_) => _poll(pool),
       );
     }
+    // 监听写入事件，触发 _write
+    writeController.stream.listen(_write);
   }
 
   final String deviceId;
@@ -50,9 +50,9 @@ final class ChannelSessionForModbus
   @override
   Sink<Point> get write => writeController;
 
-  void _write(Point point) async {}
+  Future<void> _write(Point point) async {}
 
-  void _poll(ModbusPoll poll) async {
+  Future<void> _poll(ModbusPoll poll) async {
     List<dynamic>? reads;
 
     try {
@@ -78,16 +78,18 @@ final class ChannelSessionForModbus
             poll.length,
           );
       }
-    } on Exception catch (e, stack) {}
+    } on Exception {
+      // ...existing code...
+    }
 
     if (reads != null) {
       for (final point in templateOption.reads) {
+        // 确保整段点位落在轮询窗口内
         if (point.address >= poll.address &&
-            point.address <= poll.address + poll.length) {
-          final temp = reads.sublist(
-            poll.address - point.address,
-            point.length,
-          );
+            point.address + point.length <= poll.address + poll.length) {
+          final start = point.address - poll.address;
+          final end = start + point.length;
+          final temp = reads.sublist(start, end);
 
           dynamic value;
 
@@ -138,8 +140,12 @@ final class ChannelFactoryForModbus
     required ModbusDeviceExt channelOption,
     required ModbusTemplate templateOption,
   }) {
-    // TODO: implement create
-    throw UnimplementedError();
+    return ChannelSessionForModbus(
+      deviceId,
+      transport: transport,
+      channelOption: channelOption,
+      templateOption: templateOption,
+    );
   }
 
   @override
