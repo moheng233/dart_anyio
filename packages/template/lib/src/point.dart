@@ -1,24 +1,34 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
-import '../service.dart';
+import 'template.dart';
 
-typedef Point = (PointId, PointValue);
+part 'point.freezed.dart';
+
+enum PointType { bool, int, uint, float }
 
 @immutable
-final class PointId {
-  const PointId(this.deviceId, this.tagId);
+@freezed
+final class Point with _$Point {
+  const Point(this.deviceId, this.tagId, this.value);
 
+  @override
   final String deviceId;
+
+  @override
   final String tagId;
 
   @override
-  int get hashCode => Object.hash(deviceId, tagId);
+  final PointValue value;
+}
+
+@immutable
+@freezed
+final class PointId with _$PointId {
+  const PointId(this.deviceId, this.tagId);
 
   @override
-  bool operator ==(Object other) {
-    return identical(this, other) ||
-        (other is PointId &&
-            deviceId == other.deviceId &&
-            tagId == other.tagId);
-  }
+  final String deviceId;
+  
+  @override
+  final String tagId;
 }

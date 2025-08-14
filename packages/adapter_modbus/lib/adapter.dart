@@ -1,7 +1,9 @@
+import 'dart:isolate';
+
 import 'package:anyio_template/service.dart';
 import 'package:anyio_template/src/logger.dart';
 
-import 'src/template.dart';
+import 'src/protocol.dart';
 
 final class AdapterPluginForModbus extends AdapterPluginBase {
   @override
@@ -10,12 +12,10 @@ final class AdapterPluginForModbus extends AdapterPluginBase {
   String get version => '1.0.0';
 
   @override
-  Future<void> up(ChannelManager manager, Logger logger) {
-    manager.registerFactory('modbus', );
+  Future<void> up(ChannelManager manager, Logger logger) async {
+    manager.registerFactory('modbus', ChannelFactoryForModbus());
   }
 
   @override
-  Future<void> down(ChannelManager manager) {
-
-  }
+  Future<void> down(ChannelManager manager) async {}
 }

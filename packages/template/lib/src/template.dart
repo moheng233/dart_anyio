@@ -25,28 +25,10 @@ abstract class DeviceBase with _$DeviceBase {
   }) = _DeviceBase;
 }
 
-@JsonEnum(alwaysCreate: true)
-enum SerialPartiy { none, odd, even, mark, space }
-
 @Freezed(unionKey: 'type')
 sealed class TransportOption with _$TransportOption {
   factory TransportOption.fromJson(Map<String, dynamic> json) =>
       _$TransportOptionFromJson(json);
-
-  factory TransportOption.serial(
-    String dev, {
-    @Default(9600) int baudRate,
-    @Default(8) int dataBits,
-    @Default(SerialPartiy.none) SerialPartiy parity,
-    @Default(1) int stopBits,
-    @Default(Duration(microseconds: 100)) Duration frameTimeout,
-  }) = TransportOptionForSerial;
-
-  factory TransportOption.tcp(
-    String host,
-    int port, {
-    @Default(Duration(microseconds: 100)) Duration frameTimeout,
-  }) = TransportOptionForTcp;
 
   factory TransportOption.can(
     String dev, {

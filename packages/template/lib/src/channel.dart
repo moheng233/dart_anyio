@@ -1,5 +1,7 @@
+import 'package:freezed_annotation/freezed_annotation.dart';
+
+import 'event.dart';
 import 'logger.dart';
-import 'point.dart';
 import 'transport.dart';
 
 abstract base class ChannelManager {
@@ -13,7 +15,9 @@ abstract base class ChannelManager {
   ChannelSession getSession(String deviceId);
 
   ChannelSession create(
-    String deviceId, {
+    String deviceId,
+    String channelType, {
+    required Stream<DeviceBaseEvent> deviceEvent,
     required TransportSession transport,
     required dynamic channelOption,
     required dynamic templateOption,
@@ -26,8 +30,15 @@ abstract base class ChannelManager {
 typedef ChannelSession = ChannelSessionBase<dynamic, dynamic>;
 
 abstract base class ChannelSessionBase<CP, TP> {
-  Stream<Point> get read;
-  Sink<Point> get write;
+  ChannelSessionBase({required this.write});
+
+  Stream<ChannelBaseEvent> get read;
+
+  @protected
+  final Stream<DeviceBaseEvent> write;
+
+  void open();
+  void stop();
 }
 
 typedef ChannelFactory =
@@ -44,6 +55,7 @@ abstract base class ChannelFactoryBase<
 
   S create(
     String deviceId, {
+    required Stream<DeviceBaseEvent> deviceEvent,
     required TransportSession transport,
     required CP channelOption,
     required TP templateOption,

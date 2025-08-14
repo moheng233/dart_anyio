@@ -44,7 +44,7 @@ final class ModbusClient {
   late final StreamTransformer<Uint8List, ModbusResponsePacket> _responeFrom;
 
   final Stream<Uint8List> read;
-  final IOSink write;
+  final StreamSink<List<int>> write;
 
   int transactionId = 0;
 
@@ -54,6 +54,14 @@ final class ModbusClient {
       >();
   final inFlights =
       <int, ({Completer<ModbusResponsePacket> completer, Timer timer})>{};
+
+  Future<ModbusResponsePacket> request(
+    int unitId,
+    ModbusPDURequest pdu,
+    int? transactionId,
+  ) async {
+    return _sendRequst(ModbusRequestPacket(unitId, pdu, transactionId)).future;
+  }
 
   void _onRespone(ModbusResponsePacket respone) {
     final key = respone.transactionId ?? 0;
@@ -93,20 +101,9 @@ final class ModbusClient {
       _request.add(item.request);
     }
   }
-
-  Future<ModbusResponsePacket> request(
-    int unitId,
-    ModbusPDURequest pdu,
-    int? transactionId,
-  ) async {
-    return _sendRequst(ModbusRequestPacket(unitId, pdu, transactionId)).future;
-  }
 }
 
 extension ModbusClientHelper on ModbusClient {
-  // 统一生成事务号（RTU 模式不使用事务号）
-  int? _nextTx() => isRtu ? null : transactionId += 1;
-
   Future<List<bool>> readCoils(int unitId, int start, int quantity) async {
     final resp = await request(
       unitId,
@@ -129,6 +126,20 @@ extension ModbusClientHelper on ModbusClient {
     return (resp.pdu as ReadDiscreteInputsResponse).values;
   }
 
+  Future<List<int>> readHoldingRegisters(
+    int unitId,
+    int start,
+    int quantity,
+  ) async {
+    final respone = await request(
+      unitId,
+      ModbusPDURequest.readHoldingRegisters(start, quantity),
+      _nextTx(),
+    );
+
+    return (respone.pdu as ReadHoldingRegistersResponse).values;
+  }
+
   Future<List<int>> readInputRegisters(
     int unitId,
     int start,
@@ -142,27 +153,14 @@ extension ModbusClientHelper on ModbusClient {
     return (resp.pdu as ReadInputRegistersResponse).values;
   }
 
-  // ignore: avoid_positional_boolean_parameters 统一接口
-  Future<bool> writeSingleCoil(int unitId, int addr, bool value) async {
-    final resp = await request(
+  Future<int> writeHoldingRegister(int unitId, int addr, int value) async {
+    final respone = await request(
       unitId,
-      ModbusPDURequest.writeSingleCoil(addr, value),
+      ModbusPDURequest.writeSingleRegister(addr, value),
       _nextTx(),
     );
-    return (resp.pdu as WriteSingleCoilResponse).value;
-  }
 
-  Future<int> writeMultipleRegisters(
-    int unitId,
-    int start,
-    List<int> values,
-  ) async {
-    final resp = await request(
-      unitId,
-      ModbusPDURequest.writeMultipleRegisters(start, values),
-      _nextTx(),
-    );
-    return (resp.pdu as WriteMultipleRegistersResponse).quantity;
+    return (respone.pdu as WriteSingleRegisterResponse).value;
   }
 
   Future<int> writeMultipleCoils(
@@ -178,27 +176,29 @@ extension ModbusClientHelper on ModbusClient {
     return (resp.pdu as WriteMultipleCoilsResponse).quantity;
   }
 
-  Future<List<int>> readHoldingRegisters(
+  Future<int> writeMultipleRegisters(
     int unitId,
     int start,
-    int quantity,
+    List<int> values,
   ) async {
-    final respone = await request(
+    final resp = await request(
       unitId,
-      ModbusPDURequest.readHoldingRegisters(start, quantity),
-      isRtu ? null : transactionId += 1,
+      ModbusPDURequest.writeMultipleRegisters(start, values),
+      _nextTx(),
     );
-
-    return (respone.pdu as ReadHoldingRegistersResponse).values;
+    return (resp.pdu as WriteMultipleRegistersResponse).quantity;
   }
 
-  Future<int> writeHoldingRegister(int unitId, int addr, int value) async {
-    final respone = await request(
+  // ignore: avoid_positional_boolean_parameters 统一接口
+  Future<bool> writeSingleCoil(int unitId, int addr, bool value) async {
+    final resp = await request(
       unitId,
-      ModbusPDURequest.writeSingleRegister(addr, value),
-      isRtu ? null : transactionId += 1,
+      ModbusPDURequest.writeSingleCoil(addr, value),
+      _nextTx(),
     );
-
-    return (respone.pdu as WriteSingleRegisterResponse).value;
+    return (resp.pdu as WriteSingleCoilResponse).value;
   }
+
+  // 统一生成事务号（RTU 模式不使用事务号）
+  int? _nextTx() => isRtu ? null : transactionId += 1;
 }

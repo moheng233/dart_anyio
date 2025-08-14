@@ -1,6 +1,8 @@
 import '../service.dart';
 
 abstract class Device {
+  String get deviceId;
+
   Map<String, PointValue> get values;
   List<PointInfo> get points;
 

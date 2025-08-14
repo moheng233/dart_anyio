@@ -147,36 +147,12 @@ class ModbusRtuRequestSerializer
 
   /// 获取请求的功能码
   int _getRequestFunctionCode(ModbusPDURequest request) {
-    return switch (request) {
-      ReadCoilsRequest() => 0x01,
-      ReadDiscreteInputsRequest() => 0x02,
-      ReadHoldingRegistersRequest() => 0x03,
-      ReadInputRegistersRequest() => 0x04,
-      WriteSingleCoilRequest() => 0x05,
-      WriteSingleRegisterRequest() => 0x06,
-      WriteMultipleCoilsRequest() => 0x0F,
-      WriteMultipleRegistersRequest() => 0x10,
-    };
+  return ModbusPduProcessor.getRequestFunctionCode(request);
   }
 
   /// 计算RTU请求数据长度
   int _calculateRtuRequestDataLength(ModbusPDURequest request) {
-    return switch (request) {
-      ReadCoilsRequest() => 4, // startAddr + quantity
-      ReadDiscreteInputsRequest() => 4, // startAddr + quantity
-      ReadHoldingRegistersRequest() => 4, // startAddr + quantity
-      ReadInputRegistersRequest() => 4, // startAddr + quantity
-      WriteSingleCoilRequest() => 4, // addr + value
-      WriteSingleRegisterRequest() => 4, // addr + value
-      WriteMultipleCoilsRequest() =>
-        5 +
-            ((request.values.length + 7) ~/
-                8), // startAddr + quantity + byteCount + data
-      WriteMultipleRegistersRequest() =>
-        5 +
-            (request.values.length *
-                2), // startAddr + quantity + byteCount + data
-    };
+  return ModbusPduProcessor.calculateRequestBodyLength(request);
   }
 
   /// 填充请求数据
@@ -185,54 +161,7 @@ class ModbusRtuRequestSerializer
     ModbusPDURequest request,
     int offset,
   ) {
-    switch (request) {
-      case ReadCoilsRequest():
-        view.setUint16(offset, request.startAddress);
-        view.setUint16(offset + 2, request.quantity);
-      case ReadDiscreteInputsRequest():
-        view.setUint16(offset, request.startAddress);
-        view.setUint16(offset + 2, request.quantity);
-      case ReadHoldingRegistersRequest():
-        view.setUint16(offset, request.startAddress);
-        view.setUint16(offset + 2, request.quantity);
-      case ReadInputRegistersRequest():
-        view.setUint16(offset, request.startAddress);
-        view.setUint16(offset + 2, request.quantity);
-      case WriteSingleCoilRequest():
-        view.setUint16(offset, request.address);
-        view.setUint16(offset + 2, request.value ? 0xFF00 : 0x0000);
-      case WriteSingleRegisterRequest():
-        view.setUint16(offset, request.address);
-        view.setUint16(offset + 2, request.value);
-      case WriteMultipleCoilsRequest():
-        view.setUint16(offset, request.startAddress);
-        view.setUint16(offset + 2, request.values.length);
-        final byteCount = (request.values.length + 7) ~/ 8;
-        view.setUint8(offset + 4, byteCount);
-        _packCoilsToBytes(view, request.values, offset + 5);
-      case WriteMultipleRegistersRequest():
-        view.setUint16(offset, request.startAddress);
-        view.setUint16(offset + 2, request.values.length);
-        view.setUint8(offset + 4, request.values.length * 2);
-        for (var i = 0; i < request.values.length; i++) {
-          view.setUint16(offset + 5 + i * 2, request.values[i]);
-        }
-    }
-  }
-
-  /// 将线圈布尔值打包成字节
-  void _packCoilsToBytes(ByteData view, List<bool> coils, int offset) {
-    final byteCount = (coils.length + 7) ~/ 8;
-    for (var byteIndex = 0; byteIndex < byteCount; byteIndex++) {
-      var byte = 0;
-      for (var bitIndex = 0; bitIndex < 8; bitIndex++) {
-        final coilIndex = byteIndex * 8 + bitIndex;
-        if (coilIndex < coils.length && coils[coilIndex]) {
-          byte |= 1 << bitIndex;
-        }
-      }
-      view.setUint8(offset + byteIndex, byte);
-    }
+  ModbusPduProcessor.fillRequestData(view, request, offset);
   }
 }
 
@@ -302,118 +231,7 @@ class ModbusRtuResponseParser
 
   /// 解析响应数据
   ModbusPDUResponse _parseResponseData(int functionCode, Uint8List data) {
-    final dataView = ByteData.view(data.buffer);
-
-    // 处理错误响应
-    if (functionCode >= 0x80) {
-      return ModbusPDUResponse.error(dataView.getUint8(0));
-    }
-
-    return switch (functionCode) {
-      0x01 => _parseCoilsResponse(data), // ReadCoils
-      0x02 => _parseDiscreteInputsResponse(data), // ReadDiscreteInputs
-      0x03 => _parseHoldingRegistersResponse(data), // ReadHoldingRegisters
-      0x04 => _parseInputRegistersResponse(data), // ReadInputRegisters
-      0x05 => _parseSingleCoilResponse(data), // WriteSingleCoil
-      0x06 => _parseSingleRegisterResponse(data), // WriteSingleRegister
-      0x0F => _parseMultipleCoilsResponse(data), // WriteMultipleCoils
-      0x10 => _parseMultipleRegistersResponse(data), // WriteMultipleRegisters
-      _ =>
-        throw ModbusException(
-          'Unsupported function code',
-          'Function code 0x${functionCode.toRadixString(16)} is not supported',
-        ),
-    };
-  }
-
-  /// 解析读取线圈响应
-  ModbusPDUResponse _parseCoilsResponse(Uint8List data) {
-    final byteCount = data[0];
-    final coilData = data.sublist(1, 1 + byteCount);
-    final coils = <bool>[];
-
-    for (var byteIndex = 0; byteIndex < byteCount; byteIndex++) {
-      final byte = coilData[byteIndex];
-      for (var bitIndex = 0; bitIndex < 8; bitIndex++) {
-        coils.add((byte & (1 << bitIndex)) != 0);
-      }
-    }
-
-    return ModbusPDUResponse.readCoils(coils);
-  }
-
-  /// 解析读取离散输入响应
-  ModbusPDUResponse _parseDiscreteInputsResponse(Uint8List data) {
-    final byteCount = data[0];
-    final inputData = data.sublist(1, 1 + byteCount);
-    final inputs = <bool>[];
-
-    for (var byteIndex = 0; byteIndex < byteCount; byteIndex++) {
-      final byte = inputData[byteIndex];
-      for (var bitIndex = 0; bitIndex < 8; bitIndex++) {
-        inputs.add((byte & (1 << bitIndex)) != 0);
-      }
-    }
-
-    return ModbusPDUResponse.readDiscreteInputs(inputs);
-  }
-
-  /// 解析读取保持寄存器响应
-  ModbusPDUResponse _parseHoldingRegistersResponse(Uint8List data) {
-    final byteCount = data[0];
-    final registerData = data.sublist(1, 1 + byteCount);
-    final registers = <int>[];
-
-    for (var i = 0; i < byteCount; i += 2) {
-      registers.add(ByteData.view(registerData.buffer).getUint16(i));
-    }
-
-    return ModbusPDUResponse.readHoldingRegisters(registers);
-  }
-
-  /// 解析读取输入寄存器响应
-  ModbusPDUResponse _parseInputRegistersResponse(Uint8List data) {
-    final byteCount = data[0];
-    final registerData = data.sublist(1, 1 + byteCount);
-    final registers = <int>[];
-
-    for (var i = 0; i < byteCount; i += 2) {
-      registers.add(ByteData.view(registerData.buffer).getUint16(i));
-    }
-
-    return ModbusPDUResponse.readInputRegisters(registers);
-  }
-
-  /// 解析写单个线圈响应
-  ModbusPDUResponse _parseSingleCoilResponse(Uint8List data) {
-    final dataView = ByteData.view(data.buffer);
-    final address = dataView.getUint16(0);
-    final value = dataView.getUint16(2) == 0xFF00;
-    return ModbusPDUResponse.writeSingleCoil(address, value);
-  }
-
-  /// 解析写单个寄存器响应
-  ModbusPDUResponse _parseSingleRegisterResponse(Uint8List data) {
-    final dataView = ByteData.view(data.buffer);
-    final address = dataView.getUint16(0);
-    final value = dataView.getUint16(2);
-    return ModbusPDUResponse.writeSingleRegister(address, value);
-  }
-
-  /// 解析写多个线圈响应
-  ModbusPDUResponse _parseMultipleCoilsResponse(Uint8List data) {
-    final dataView = ByteData.view(data.buffer);
-    final startAddress = dataView.getUint16(0);
-    final quantity = dataView.getUint16(2);
-    return ModbusPDUResponse.writeMultipleCoils(startAddress, quantity);
-  }
-
-  /// 解析写多个寄存器响应
-  ModbusPDUResponse _parseMultipleRegistersResponse(Uint8List data) {
-    final dataView = ByteData.view(data.buffer);
-    final startAddress = dataView.getUint16(0);
-    final quantity = dataView.getUint16(2);
-    return ModbusPDUResponse.writeMultipleRegisters(startAddress, quantity);
+    return ModbusPduProcessor.parseResponse(functionCode, data);
   }
 
   /// 计算RTU响应包长度

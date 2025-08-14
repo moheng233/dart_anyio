@@ -11,10 +11,13 @@ abstract base class TransportManager {
   TransportSessionBase<dynamic> create(String type, dynamic option);
 }
 
+typedef TransportFactory = TransportFactoryBase<dynamic>;
+
 abstract interface class TransportFactoryBase<O> {
   O loadOption(Map<dynamic, dynamic> json);
 
   TransportSessionBase<O> create(O option);
+  String getSessionId(O option);
 }
 
 typedef TransportSession = TransportSessionBase<dynamic>;
@@ -22,7 +25,7 @@ typedef TransportSession = TransportSessionBase<dynamic>;
 /// > 抽象类 用于插件调用
 abstract interface class TransportSessionBase<O> {
   Stream<Uint8List> get read;
-  IOSink get write;
+  StreamSink<List<int>> get write;
 
   bool get isOpened;
 

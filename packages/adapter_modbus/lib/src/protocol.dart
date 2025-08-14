@@ -1,16 +1,18 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:anyio_modbus/modbus_client.dart';
 import 'package:anyio_template/service.dart';
-import 'package:anyio_template/src/point.dart';
 import 'package:anyio_template/util.dart';
 
 import 'template.dart';
 
 final class ChannelSessionForModbus
-    extends ChannelSessionBase<ModbusDeviceExt, ModbusTemplate> {
+    extends
+        ChannelSessionBase<ChannelOptionForModbus, ChannelTemplateForModbus> {
   ChannelSessionForModbus(
     this.deviceId, {
+    required super.write,
     required this.transport,
     required this.channelOption,
     required this.templateOption,
@@ -19,14 +21,7 @@ final class ChannelSessionForModbus
          transport.write,
          isRtu: channelOption.isRtu,
        ) {
-    for (final pool in templateOption.polls) {
-      poolMap[pool] = Timer.periodic(
-        Duration(milliseconds: pool.intervalTime),
-        (_) => _poll(pool),
-      );
-    }
-    // 监听写入事件，触发 _write
-    writeController.stream.listen(_write);
+    write.listen(_write);
   }
 
   final String deviceId;
@@ -34,23 +29,19 @@ final class ChannelSessionForModbus
   final ModbusClient client;
 
   final TransportSession transport;
-  final ModbusDeviceExt channelOption;
-  final ModbusTemplate templateOption;
+  final ChannelOptionForModbus channelOption;
+  final ChannelTemplateForModbus templateOption;
 
   final poolMap = <ModbusPoll, Timer>{};
 
-  final readController = StreamController<Point>();
-  final writeController = StreamController<Point>();
+  final readController = StreamController<ChannelBaseEvent>();
 
   int get _unitId => channelOption.unitId;
 
   @override
-  Stream<Point> get read => readController.stream;
+  Stream<ChannelBaseEvent> get read => readController.stream;
 
-  @override
-  Sink<Point> get write => writeController;
-
-  Future<void> _write(Point point) async {}
+  Future<void> _write(DeviceBaseEvent event) async {}
 
   Future<void> _poll(ModbusPoll poll) async {
     List<dynamic>? reads;
@@ -58,23 +49,23 @@ final class ChannelSessionForModbus
     try {
       switch (poll.function) {
         case 1:
-          reads = await client.readCoils(_unitId, poll.address, poll.length);
+          reads = await client.readCoils(_unitId, poll.begin, poll.length);
         case 2:
           reads = await client.readDiscreteInputs(
             _unitId,
-            poll.address,
+            poll.begin,
             poll.length,
           );
         case 3:
           reads = await client.readHoldingRegisters(
             _unitId,
-            poll.address,
+            poll.begin,
             poll.length,
           );
         case 4:
           reads = await client.readInputRegisters(
             _unitId,
-            poll.address,
+            poll.begin,
             poll.length,
           );
       }
@@ -83,65 +74,110 @@ final class ChannelSessionForModbus
     }
 
     if (reads != null) {
-      for (final point in templateOption.reads) {
-        // 确保整段点位落在轮询窗口内
-        if (point.address >= poll.address &&
-            point.address + point.length <= poll.address + poll.length) {
-          final start = point.address - poll.address;
-          final end = start + point.length;
-          final temp = reads.sublist(start, end);
+      final updates = <Point>[];
+      final ts = DateTime.timestamp().millisecondsSinceEpoch;
 
-          dynamic value;
+      if (poll.function == 1 || poll.function == 2) {
+        final view = reads.cast<bool>();
 
-          switch (point.type) {
-            case ModbusPointType.bool:
-              value = ValueListHelper.readBool(temp);
-            case ModbusPointType.int:
-              value = ValueListHelper.readInt(
-                temp,
-                point.length,
-                point.endian.endian,
-              );
-            case ModbusPointType.uint:
-              value = ValueListHelper.readUint(
-                temp,
-                point.length,
-                point.endian.endian,
-              );
-            case ModbusPointType.float:
-              value = ValueListHelper.readFloat(
-                temp,
-                point.length,
-                point.endian.endian,
-              );
-          }
+        for (final point in poll.points) {
+          updates.add(
+            Point(
+              deviceId,
+              point.tag,
+              PointValue.boolean(view[point.offset], ts),
+            ),
+          );
+        }
+      } else {
+        // 正确构建字节数组：确保 Modbus 寄存器数据按大端序排列
+        final registers = reads.cast<int>();
+        final bytes = Uint8List(registers.length * 2);
+        final view = ByteData.view(bytes.buffer);
+        
+        // 手动按大端序设置每个寄存器
+        for (var i = 0; i < registers.length; i++) {
+          view.setUint16(i * 2, registers[i]);
+        }
 
-          readController.add((
-            PointId(deviceId, point.tag),
-            PointValue.fromValue(value, DateTime.now().millisecondsSinceEpoch),
-          ));
+        for (final point in poll.points) {
+          final endian = point.endian.endian;
+          final swap = point.endian.swap;
+          final offset = point.offset * 2;
+
+          final value = switch (point.type) {
+            PointType.bool => reads[point.offset] != 0,
+            PointType.int => switch (point.length) {
+              2 => view.getUint32Swap(offset, endian: endian, swap: swap),
+              4 => view.getInt64(offset, endian),
+              int() => view.getInt16(offset, endian),
+            },
+            PointType.uint => switch (point.length) {
+              2 => view.getUint32Swap(offset, endian: endian, swap: swap),
+              4 => view.getUint64(offset, endian),
+              int() => view.getUint16(offset, endian),
+            },
+            PointType.float => switch (point.length) {
+              4 => view.getFloat64(offset, endian),
+              int() => view.getFloat32Swap(offset, endian: endian, swap: swap),
+            },
+          };
+
+          updates.add(
+            Point(
+              deviceId,
+              point.tag,
+              PointValue.fromValue(
+                value,
+                DateTime.now().millisecondsSinceEpoch,
+              ),
+            ),
+          );
         }
       }
+
+      readController.add(ChannelUpdateEvent(deviceId, updates));
     }
+  }
+
+  @override
+  void open() {
+    for (final pool in templateOption.polls) {
+      poolMap[pool] = Timer.periodic(
+        Duration(milliseconds: pool.intervalTime),
+        (_) => _poll(pool),
+      );
+    }
+  }
+
+  @override
+  void stop() {
+    for (final timer in poolMap.values) {
+      timer.cancel();
+    }
+
+    poolMap.clear();
   }
 }
 
 final class ChannelFactoryForModbus
     extends
         ChannelFactoryBase<
-          ModbusDeviceExt,
-          ModbusTemplate,
+          ChannelOptionForModbus,
+          ChannelTemplateForModbus,
           ChannelSessionForModbus
         > {
   @override
   ChannelSessionForModbus create(
     String deviceId, {
+    required Stream<DeviceBaseEvent> deviceEvent,
     required TransportSession transport,
-    required ModbusDeviceExt channelOption,
-    required ModbusTemplate templateOption,
+    required ChannelOptionForModbus channelOption,
+    required ChannelTemplateForModbus templateOption,
   }) {
     return ChannelSessionForModbus(
       deviceId,
+      write: deviceEvent,
       transport: transport,
       channelOption: channelOption,
       templateOption: templateOption,
@@ -149,12 +185,12 @@ final class ChannelFactoryForModbus
   }
 
   @override
-  ModbusDeviceExt loadChannelOption(Map<dynamic, dynamic> json) {
-    return ModbusDeviceExt.fromJson(json);
+  ChannelOptionForModbus loadChannelOption(Map<dynamic, dynamic> json) {
+    return ChannelOptionForModbus.fromJson(json);
   }
 
   @override
-  ModbusTemplate loadTemplateOption(Map<dynamic, dynamic> json) {
-    return ModbusTemplate.fromJson(json);
+  ChannelTemplateForModbus loadTemplateOption(Map<dynamic, dynamic> json) {
+    return ChannelTemplateForModbus.fromJson(json);
   }
 }
