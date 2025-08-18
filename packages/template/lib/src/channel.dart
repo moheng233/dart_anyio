@@ -21,8 +21,8 @@ abstract base class ChannelManager {
     String channelType, {
     required Stream<DeviceBaseEvent> deviceEvent,
     required TransportSession transport,
-    required dynamic channelOption,
-    required dynamic templateOption,
+    required ChannelOptionBase channelOption,
+    required ChannelTemplateBase templateOption,
   });
 
   dynamic loadChannelOption(String channelType, Map<dynamic, dynamic> json);
