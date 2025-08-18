@@ -1,9 +1,10 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
+import 'package:meta/meta.dart';
 
 import 'point.dart';
 import 'template.dart';
 
-part 'event.freezed.dart';
+part 'event.mapper.dart';
 
 @immutable
 sealed class ChannelBaseEvent {
@@ -13,26 +14,24 @@ sealed class ChannelBaseEvent {
 }
 
 @immutable
-@freezed
+@MappableClass()
 final class ChannelUpdateEvent extends ChannelBaseEvent
-    with _$ChannelUpdateEvent {
+    with ChannelUpdateEventMappable {
   const ChannelUpdateEvent(this.deviceId, this.updates);
 
   @override
   final String deviceId;
-  @override
   final List<Point> updates;
 }
 
 @immutable
-@freezed
+@MappableClass()
 final class ChannelWriteResultEvent extends ChannelBaseEvent
-    with _$ChannelWriteResultEvent {
+    with ChannelWriteResultEventMappable {
   const ChannelWriteResultEvent(this.deviceId, {required this.success});
 
   @override
   final String deviceId;
-  @override
   final bool success;
 }
 
@@ -42,14 +41,12 @@ sealed class DeviceBaseEvent {
 }
 
 @immutable
-@freezed
-final class DeviceWriteEvent extends DeviceBaseEvent with _$DeviceWriteEvent {
+@MappableClass()
+final class DeviceWriteEvent extends DeviceBaseEvent
+    with DeviceWriteEventMappable {
   const DeviceWriteEvent(this.deviceId, this.tagId, this.value);
 
-  @override
   final String deviceId;
-  @override
   final String tagId;
-  @override
-  final PointValue value;
+  final Object? value;
 }

@@ -1,12 +1,11 @@
 import 'dart:typed_data';
 
 import 'package:anyio_template/service.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 
-part 'template.freezed.dart';
-part 'template.g.dart';
+part 'template.mapper.dart';
 
-@JsonEnum(fieldRename: FieldRename.screamingSnake)
+@MappableEnum(caseStyle: CaseStyle.lowerCase)
 enum ModbusEndianType {
   /// ABCD: 大端序，字节顺序 [A,B,C,D] - 标准大端
   abcd(Endian.big, swap: false),
@@ -26,67 +25,76 @@ enum ModbusEndianType {
   final bool swap;
 }
 
-@freezed
-abstract class ChannelOptionForModbus with _$ChannelOptionForModbus {
-  const factory ChannelOptionForModbus({
-    required bool isRtu,
-    required int unitId,
-  }) = _ChannelOptionForModbus;
+@MappableEnum(caseStyle: CaseStyle.lowerCase)
+enum ModbusAccessType {
+  r(),
+  rw(write: true),
+  w(read: false, write: true);
 
-  factory ChannelOptionForModbus.fromJson(Map<dynamic, dynamic> json) =>
-      _$ChannelOptionForModbusFromJson(json);
+  const ModbusAccessType({this.read = true, this.write = false});
+
+  final bool read;
+  final bool write;
 }
 
-@freezed
-abstract class ChannelTemplateForModbus with _$ChannelTemplateForModbus {
-  const factory ChannelTemplateForModbus({
-    required List<ModbusPoll> polls,
-    required List<ModbusWritePoint> writes,
-  }) = _ChannelTemplateForModbus;
+@MappableClass(discriminatorKey: 'adapter', discriminatorValue: 'modbus')
+final class ChannelOptionForModbus extends ChannelOptionBase
+    with ChannelOptionForModbusMappable {
+  const ChannelOptionForModbus({
+    required this.isRtu,
+    required this.unitId,
+  });
 
-  factory ChannelTemplateForModbus.fromJson(Map<dynamic, dynamic> json) =>
-      _$ChannelTemplateForModbusFromJson(json);
+  final bool isRtu;
+  final int unitId;
 }
 
-@freezed
-abstract class ModbusPoll with _$ModbusPoll {
-  const factory ModbusPoll({
-    required int intervalTime,
-    required int function,
-    required int begin,
-    required int length,
-    required List<ModbusReadPoint> points,
-  }) = _ModbusPoll;
+@MappableClass(discriminatorKey: 'adapter', discriminatorValue: 'modbus')
+final class ChannelTemplateForModbus extends ChannelTemplateBase
+    with ChannelTemplateForModbusMappable {
+  const ChannelTemplateForModbus(
+    super.name,
+    super.version, {
+    required this.polls,
+  });
 
-  factory ModbusPoll.fromJson(Map<dynamic, dynamic> json) =>
-      _$ModbusPollFromJson(json);
+  final List<ModbusPoll> polls;
 }
 
-@freezed
-abstract class ModbusReadPoint with _$ModbusReadPoint {
-  const factory ModbusReadPoint({
-    required String tag,
-    required int offset,
-    @Default(1) double scale,
-    @Default(1) int length,
-    @Default(ModbusEndianType.dcba) ModbusEndianType endian,
-    @Default(PointType.uint) PointType type,
-  }) = _ModbusReadPoint;
+@MappableClass()
+final class ModbusPoll with ModbusPollMappable {
+  const ModbusPoll({
+    required this.intervalTime,
+    required this.function,
+    required this.begin,
+    required this.length,
+    required this.points,
+  });
 
-  factory ModbusReadPoint.fromJson(Map<dynamic, dynamic> json) =>
-      _$ModbusReadPointFromJson(json);
+  final int intervalTime;
+  final int function;
+  final int begin;
+  final int length;
+  final List<ModbusPoint> points;
 }
 
-@freezed
-abstract class ModbusWritePoint with _$ModbusWritePoint {
-  const factory ModbusWritePoint({
-    required String tag,
-    required int function,
-    required int address,
-    required ModbusEndianType encode,
-    required PointType type,
-  }) = _ModbusWritePoint;
+@MappableClass()
+final class ModbusPoint with ModbusPointMappable {
+  const ModbusPoint({
+    required this.tag,
+    required this.offset,
+    this.scale = 1,
+    this.length = 1,
+    this.endian = ModbusEndianType.dcba,
+    this.type = PointType.uint,
+    this.access = ModbusAccessType.r,
+  });
 
-  factory ModbusWritePoint.fromJson(Map<dynamic, dynamic> json) =>
-      _$ModbusWritePointFromJson(json);
+  final String tag;
+  final int offset;
+  final double scale;
+  final int length;
+  final ModbusEndianType endian;
+  final PointType type;
+  final ModbusAccessType access;
 }

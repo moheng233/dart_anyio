@@ -2,6 +2,8 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:dart_mappable/dart_mappable.dart';
+
 /// 传输通道管理类
 /// > 抽象类 用于插件调用
 abstract base class TransportManager {
@@ -11,10 +13,10 @@ abstract base class TransportManager {
   TransportSessionBase<dynamic> create(String type, dynamic option);
 }
 
-typedef TransportFactory = TransportFactoryBase<dynamic>;
+typedef TransportFactory = TransportFactoryBase<Object>;
 
-abstract interface class TransportFactoryBase<O> {
-  O loadOption(Map<dynamic, dynamic> json);
+abstract interface class TransportFactoryBase<O extends Object> {
+  ClassMapperBase<O> get optionMapper;
 
   TransportSessionBase<O> create(O option);
   String getSessionId(O option);

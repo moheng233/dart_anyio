@@ -3,11 +3,11 @@ import '../service.dart';
 abstract class Device {
   String get deviceId;
 
-  Map<String, PointValue> get values;
+  Map<String, Object?> get values;
   List<PointInfo> get points;
 
-  PointValue read(String tagId);
-  Stream<PointValue> listen(String tagId);
+  Object? read(String tagId);
+  Stream<Object?> listen(String tagId);
 
   void write(String tagId, dynamic value);
   Future<bool> writeAsync(String tagid, dynamic value);

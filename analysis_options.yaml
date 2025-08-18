@@ -10,4 +10,5 @@ analyzer:
   exclude:
     - lib/**/*.g.dart
     - lib/**/*.freezed.dart
+    - lib/**/*.mapper.dart
     - lib/src/gen/*.dart

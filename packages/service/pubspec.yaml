@@ -13,6 +13,7 @@ resolution: workspace
 dependencies:
   anyio_adapter_modbus: ^1.0.0
   anyio_template: ^1.0.0
+  checked_yaml: ^2.0.4
   freezed_annotation: ^3.0.0
   json_annotation: ^4.9.0
   json_rpc_2: ^4.0.0

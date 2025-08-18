@@ -1,34 +1,26 @@
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
+import 'package:meta/meta.dart';
 
-import 'template.dart';
+part 'point.mapper.dart';
 
-part 'point.freezed.dart';
-
+@MappableEnum()
 enum PointType { bool, int, uint, float }
 
 @immutable
-@freezed
-final class Point with _$Point {
+@MappableClass()
+class Point with PointMappable {
   const Point(this.deviceId, this.tagId, this.value);
 
-  @override
   final String deviceId;
-
-  @override
   final String tagId;
-
-  @override
-  final PointValue value;
+  final Object? value;
 }
 
 @immutable
-@freezed
-final class PointId with _$PointId {
+@MappableClass()
+class PointId with PointIdMappable {
   const PointId(this.deviceId, this.tagId);
 
-  @override
   final String deviceId;
-  
-  @override
   final String tagId;
 }

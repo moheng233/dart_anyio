@@ -5,8 +5,6 @@ import 'frame.dart';
 /// Modbus PDU处理器
 /// 负责PDU的解析和序列化，供TCP和RTU转换器共享使用
 class ModbusPduProcessor {
-  /// Modbus 协议字段使用的大端字节序 (Big-Endian / Network Byte Order)
-  static const Endian _endian = Endian.big;
   // =========================
   // Request Parsing / Helpers
   // =========================
@@ -17,34 +15,34 @@ class ModbusPduProcessor {
     return switch (functionCode) {
       // 0x01 - Read Coils
       0x01 => ModbusPDURequest.readCoils(
-        dataView.getUint16(0, _endian),
-        dataView.getUint16(2, _endian),
+        dataView.getUint16(0),
+        dataView.getUint16(2),
       ),
       // 0x02 - Read Discrete Inputs
       0x02 => ModbusPDURequest.readDiscreteInputs(
-        dataView.getUint16(0, _endian),
-        dataView.getUint16(2, _endian),
+        dataView.getUint16(0),
+        dataView.getUint16(2),
       ),
       // 0x03 - Read Holding Registers
       0x03 => ModbusPDURequest.readHoldingRegisters(
-        dataView.getUint16(0, _endian),
-        dataView.getUint16(2, _endian),
+        dataView.getUint16(0),
+        dataView.getUint16(2),
       ),
       // 0x04 - Read Input Registers
       0x04 => ModbusPDURequest.readInputRegisters(
-        dataView.getUint16(0, _endian),
-        dataView.getUint16(2, _endian),
+        dataView.getUint16(0),
+        dataView.getUint16(2),
       ),
       // 0x05 - Write Single Coil
       0x05 => ModbusPDURequest.writeSingleCoil(
-        dataView.getUint16(0, _endian),
-        dataView.getUint16(2, _endian) ==
+        dataView.getUint16(0),
+        dataView.getUint16(2) ==
             0xFF00, // 0xFF00 = true, 0x0000 = false
       ),
       // 0x06 - Write Single Register
       0x06 => ModbusPDURequest.writeSingleRegister(
-        dataView.getUint16(0, _endian),
-        dataView.getUint16(2, _endian),
+        dataView.getUint16(0),
+        dataView.getUint16(2),
       ),
       // 0x0F - Write Multiple Coils
       0x0F => _parseWriteMultipleCoils(data),
@@ -94,35 +92,35 @@ class ModbusPduProcessor {
   ) {
     switch (request) {
       case ReadCoilsRequest():
-        view.setUint16(offset, request.startAddress, _endian);
-        view.setUint16(offset + 2, request.quantity, _endian);
+        view.setUint16(offset, request.startAddress);
+        view.setUint16(offset + 2, request.quantity);
       case ReadDiscreteInputsRequest():
-        view.setUint16(offset, request.startAddress, _endian);
-        view.setUint16(offset + 2, request.quantity, _endian);
+        view.setUint16(offset, request.startAddress);
+        view.setUint16(offset + 2, request.quantity);
       case ReadHoldingRegistersRequest():
-        view.setUint16(offset, request.startAddress, _endian);
-        view.setUint16(offset + 2, request.quantity, _endian);
+        view.setUint16(offset, request.startAddress);
+        view.setUint16(offset + 2, request.quantity);
       case ReadInputRegistersRequest():
-        view.setUint16(offset, request.startAddress, _endian);
-        view.setUint16(offset + 2, request.quantity, _endian);
+        view.setUint16(offset, request.startAddress);
+        view.setUint16(offset + 2, request.quantity);
       case WriteSingleCoilRequest():
-        view.setUint16(offset, request.address, _endian);
-        view.setUint16(offset + 2, request.value ? 0xFF00 : 0x0000, _endian);
+        view.setUint16(offset, request.address);
+        view.setUint16(offset + 2, request.value ? 0xFF00 : 0x0000);
       case WriteSingleRegisterRequest():
-        view.setUint16(offset, request.address, _endian);
-        view.setUint16(offset + 2, request.value, _endian);
+        view.setUint16(offset, request.address);
+        view.setUint16(offset + 2, request.value);
       case WriteMultipleCoilsRequest():
-        view.setUint16(offset, request.startAddress, _endian);
-        view.setUint16(offset + 2, request.values.length, _endian);
+        view.setUint16(offset, request.startAddress);
+        view.setUint16(offset + 2, request.values.length);
         final byteCount = _calculateCoilsByteCount(request.values.length);
         view.setUint8(offset + 4, byteCount);
         _packCoilsToBytes(view, request.values, offset + 5);
       case WriteMultipleRegistersRequest():
-        view.setUint16(offset, request.startAddress, _endian);
-        view.setUint16(offset + 2, request.values.length, _endian);
+        view.setUint16(offset, request.startAddress);
+        view.setUint16(offset + 2, request.values.length);
         view.setUint8(offset + 4, request.values.length * 2);
         for (var i = 0; i < request.values.length; i++) {
-          view.setUint16(offset + 5 + i * 2, request.values[i], _endian);
+          view.setUint16(offset + 5 + i * 2, request.values[i]);
         }
     }
   }
@@ -187,7 +185,7 @@ class ModbusPduProcessor {
     final registerData = data.sublist(1, 1 + byteCount);
     final registers = <int>[];
     for (var i = 0; i < byteCount; i += 2) {
-      registers.add(ByteData.view(registerData.buffer).getUint16(i, _endian));
+      registers.add(ByteData.view(registerData.buffer).getUint16(i));
     }
     return ModbusPDUResponse.readHoldingRegisters(registers);
   }
@@ -197,44 +195,44 @@ class ModbusPduProcessor {
     final registerData = data.sublist(1, 1 + byteCount);
     final registers = <int>[];
     for (var i = 0; i < byteCount; i += 2) {
-      registers.add(ByteData.view(registerData.buffer).getUint16(i, _endian));
+      registers.add(ByteData.view(registerData.buffer).getUint16(i));
     }
     return ModbusPDUResponse.readInputRegisters(registers);
   }
 
   static ModbusPDUResponse _parseSingleCoilResponse(Uint8List data) {
     final dataView = ByteData.view(data.buffer);
-    final address = dataView.getUint16(0, _endian);
-    final value = dataView.getUint16(2, _endian) == 0xFF00;
+    final address = dataView.getUint16(0);
+    final value = dataView.getUint16(2) == 0xFF00;
     return ModbusPDUResponse.writeSingleCoil(address, value);
   }
 
   static ModbusPDUResponse _parseSingleRegisterResponse(Uint8List data) {
     final dataView = ByteData.view(data.buffer);
-    final address = dataView.getUint16(0, _endian);
-    final value = dataView.getUint16(2, _endian);
+    final address = dataView.getUint16(0);
+    final value = dataView.getUint16(2);
     return ModbusPDUResponse.writeSingleRegister(address, value);
   }
 
   static ModbusPDUResponse _parseMultipleCoilsResponse(Uint8List data) {
     final dataView = ByteData.view(data.buffer);
-    final startAddress = dataView.getUint16(0, _endian);
-    final quantity = dataView.getUint16(2, _endian);
+    final startAddress = dataView.getUint16(0);
+    final quantity = dataView.getUint16(2);
     return ModbusPDUResponse.writeMultipleCoils(startAddress, quantity);
   }
 
   static ModbusPDUResponse _parseMultipleRegistersResponse(Uint8List data) {
     final dataView = ByteData.view(data.buffer);
-    final startAddress = dataView.getUint16(0, _endian);
-    final quantity = dataView.getUint16(2, _endian);
+    final startAddress = dataView.getUint16(0);
+    final quantity = dataView.getUint16(2);
     return ModbusPDUResponse.writeMultipleRegisters(startAddress, quantity);
   }
 
   /// 解析写多个线圈请求
   static ModbusPDURequest _parseWriteMultipleCoils(Uint8List data) {
     final dataView = ByteData.view(data.buffer);
-    final startAddress = dataView.getUint16(0, _endian);
-    final quantity = dataView.getUint16(2, _endian);
+    final startAddress = dataView.getUint16(0);
+    final quantity = dataView.getUint16(2);
     final byteCount = dataView.getUint8(4);
 
     final values = <bool>[];
@@ -261,7 +259,7 @@ class ModbusPduProcessor {
 
     final values = <int>[];
     for (var i = 0; i < quantity; i++) {
-      values.add(dataView.getUint16(5 + i * 2, _endian));
+      values.add(dataView.getUint16(5 + i * 2));
     }
 
     return ModbusPDURequest.writeMultipleRegisters(startAddress, values);
@@ -345,25 +343,25 @@ class ModbusPduProcessor {
       case ReadHoldingRegistersResponse():
         view.setUint8(offset, response.values.length * 2);
         for (var i = 0; i < response.values.length; i++) {
-          view.setUint16(offset + 1 + i * 2, response.values[i], _endian);
+          view.setUint16(offset + 1 + i * 2, response.values[i]);
         }
       case ReadInputRegistersResponse():
         view.setUint8(offset, response.values.length * 2);
         for (var i = 0; i < response.values.length; i++) {
-          view.setUint16(offset + 1 + i * 2, response.values[i], _endian);
+          view.setUint16(offset + 1 + i * 2, response.values[i]);
         }
       case WriteSingleCoilResponse():
-        view.setUint16(offset, response.address, _endian);
-        view.setUint16(offset + 2, response.value ? 0xFF00 : 0x0000, _endian);
+        view.setUint16(offset, response.address);
+        view.setUint16(offset + 2, response.value ? 0xFF00 : 0x0000);
       case WriteSingleRegisterResponse():
-        view.setUint16(offset, response.address, _endian);
-        view.setUint16(offset + 2, response.value, _endian);
+        view.setUint16(offset, response.address);
+        view.setUint16(offset + 2, response.value);
       case WriteMultipleCoilsResponse():
-        view.setUint16(offset, response.startAddress, _endian);
-        view.setUint16(offset + 2, response.quantity, _endian);
+        view.setUint16(offset, response.startAddress);
+        view.setUint16(offset + 2, response.quantity);
       case WriteMultipleRegistersResponse():
-        view.setUint16(offset, response.startAddress, _endian);
-        view.setUint16(offset + 2, response.quantity, _endian);
+        view.setUint16(offset, response.startAddress);
+        view.setUint16(offset + 2, response.quantity);
       case ModbusErrorResponse():
         view.setUint8(offset, response.errorCode);
     }

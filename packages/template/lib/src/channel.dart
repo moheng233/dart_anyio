@@ -1,7 +1,9 @@
+import 'package:dart_mappable/dart_mappable.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 
 import 'event.dart';
 import 'logger.dart';
+import 'template.dart';
 import 'transport.dart';
 
 abstract base class ChannelManager {
@@ -27,9 +29,13 @@ abstract base class ChannelManager {
   dynamic loadTemplateOption(String channelType, Map<dynamic, dynamic> json);
 }
 
-typedef ChannelSession = ChannelSessionBase<dynamic, dynamic>;
+typedef ChannelSession =
+    ChannelSessionBase<ChannelOptionBase, ChannelTemplateBase>;
 
-abstract base class ChannelSessionBase<CP, TP> {
+abstract base class ChannelSessionBase<
+  CP extends ChannelOptionBase,
+  TP extends ChannelTemplateBase
+> {
   ChannelSessionBase({required this.write});
 
   Stream<ChannelBaseEvent> get read;
@@ -42,16 +48,20 @@ abstract base class ChannelSessionBase<CP, TP> {
 }
 
 typedef ChannelFactory =
-    ChannelFactoryBase<dynamic, dynamic, ChannelSessionBase<dynamic, dynamic>>;
+    ChannelFactoryBase<
+      ChannelOptionBase,
+      ChannelTemplateBase,
+      ChannelSessionBase<ChannelOptionBase, ChannelTemplateBase>
+    >;
 
 /// 通道适配器工厂
 abstract base class ChannelFactoryBase<
-  CP,
-  TP,
+  CP extends ChannelOptionBase,
+  TP extends ChannelTemplateBase,
   S extends ChannelSessionBase<CP, TP>
 > {
-  CP loadChannelOption(Map<dynamic, dynamic> json);
-  TP loadTemplateOption(Map<dynamic, dynamic> json);
+  ClassMapperBase<CP> get channelOptionMapper;
+  ClassMapperBase<TP> get templateOptionMapper;
 
   S create(
     String deviceId, {

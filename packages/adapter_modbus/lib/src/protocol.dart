@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:anyio_modbus/modbus_client.dart';
 import 'package:anyio_template/service.dart';
 import 'package:anyio_template/util.dart';
+import 'package:dart_mappable/src/mappers/class_mapper.dart';
 
 import 'template.dart';
 
@@ -85,17 +86,15 @@ final class ChannelSessionForModbus
             Point(
               deviceId,
               point.tag,
-              PointValue.boolean(view[point.offset], ts),
+              view[point.offset],
             ),
           );
         }
       } else {
-        // 正确构建字节数组：确保 Modbus 寄存器数据按大端序排列
         final registers = reads.cast<int>();
         final bytes = Uint8List(registers.length * 2);
         final view = ByteData.view(bytes.buffer);
-        
-        // 手动按大端序设置每个寄存器
+
         for (var i = 0; i < registers.length; i++) {
           view.setUint16(i * 2, registers[i]);
         }
@@ -127,10 +126,7 @@ final class ChannelSessionForModbus
             Point(
               deviceId,
               point.tag,
-              PointValue.fromValue(
-                value,
-                DateTime.now().millisecondsSinceEpoch,
-              ),
+              value,
             ),
           );
         }
@@ -185,12 +181,10 @@ final class ChannelFactoryForModbus
   }
 
   @override
-  ChannelOptionForModbus loadChannelOption(Map<dynamic, dynamic> json) {
-    return ChannelOptionForModbus.fromJson(json);
-  }
+  ClassMapperBase<ChannelOptionForModbus> get channelOptionMapper =>
+      ChannelOptionForModbusMapper.ensureInitialized();
 
   @override
-  ChannelTemplateForModbus loadTemplateOption(Map<dynamic, dynamic> json) {
-    return ChannelTemplateForModbus.fromJson(json);
-  }
+  ClassMapperBase<ChannelTemplateForModbus> get templateOptionMapper =>
+      ChannelTemplateForModbusMapper.ensureInitialized();
 }

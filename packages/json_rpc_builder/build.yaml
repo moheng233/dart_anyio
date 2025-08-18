@@ -7,3 +7,11 @@ builders:
     build_to: source
     runs_before:
       - "json_serializable:json_serializable"
+  json_schema_builder:
+    import: "package:json_rpc_builder/builder.dart"
+    builder_factories: ["jsonSchemaBuilder"]
+    build_extensions: { ".dart": [".schema.part"] }
+    auto_apply: dependents
+    build_to: cache
+    applies_builders: ["source_gen:combining_builder"]
+

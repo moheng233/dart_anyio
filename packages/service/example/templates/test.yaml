@@ -1,0 +1,8 @@
+polls:
+  - begin: 0
+    length: 5
+    interval_time: 2000
+    function: 3
+    points:
+      - { tag: "n1", offset: 0, type: int, length: 2, endian: abcd }
+      - { tag: "n2", offset: 2, type: int, length: 2, endian: bcda }

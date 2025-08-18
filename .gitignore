@@ -7,4 +7,5 @@
 pubspec.lock
 
 *.freezed.dart
+*.mapper.dart
 *.g.dart

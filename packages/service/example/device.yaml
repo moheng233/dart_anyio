@@ -1,0 +1,11 @@
+devices:
+  - name: test
+    template: test
+    transport: tcp
+    channel_option:
+      isRtu: false
+      unitId: 1
+    transport_option:
+      host: 127.0.0.1
+      port: 8.8.8.8
+    

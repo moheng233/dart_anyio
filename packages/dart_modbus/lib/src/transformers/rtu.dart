@@ -131,10 +131,9 @@ class ModbusRtuRequestSerializer
     final buffer = Uint8List(
       1 + 1 + requestDataLength + 2,
     ); // unitId + fcode + data + CRC
-    final view =
-        ByteData.view(buffer.buffer)
-          ..setUint8(0, unitId)
-          ..setUint8(1, _getRequestFunctionCode(request));
+    final view = ByteData.view(buffer.buffer)
+      ..setUint8(0, unitId)
+      ..setUint8(1, _getRequestFunctionCode(request));
 
     _fillRequestData(view, request, 2);
 
@@ -147,12 +146,12 @@ class ModbusRtuRequestSerializer
 
   /// 获取请求的功能码
   int _getRequestFunctionCode(ModbusPDURequest request) {
-  return ModbusPduProcessor.getRequestFunctionCode(request);
+    return ModbusPduProcessor.getRequestFunctionCode(request);
   }
 
   /// 计算RTU请求数据长度
   int _calculateRtuRequestDataLength(ModbusPDURequest request) {
-  return ModbusPduProcessor.calculateRequestBodyLength(request);
+    return ModbusPduProcessor.calculateRequestBodyLength(request);
   }
 
   /// 填充请求数据
@@ -161,7 +160,7 @@ class ModbusRtuRequestSerializer
     ModbusPDURequest request,
     int offset,
   ) {
-  ModbusPduProcessor.fillRequestData(view, request, offset);
+    ModbusPduProcessor.fillRequestData(view, request, offset);
   }
 }
 
@@ -221,12 +220,7 @@ class ModbusRtuResponseParser
 
     final response = _parseResponseData(functionCodeByte, data);
 
-    return ModbusPacket.respone(
-          unitId,
-          response,
-          null, // RTU协议没有transactionId
-        )
-        as ModbusResponsePacket;
+    return ModbusPacket.respone(unitId, response) as ModbusResponsePacket;
   }
 
   /// 解析响应数据
@@ -303,10 +297,9 @@ class ModbusRtuResponseSerializer
     final buffer = Uint8List(
       1 + 1 + dataLength + 2,
     ); // unitId + fcode + data + CRC
-    final view =
-        ByteData.view(buffer.buffer)
-          ..setUint8(0, unitId)
-          ..setUint8(1, ModbusPduProcessor.getFunctionCode(response));
+    final view = ByteData.view(buffer.buffer)
+      ..setUint8(0, unitId)
+      ..setUint8(1, ModbusPduProcessor.getFunctionCode(response));
 
     ModbusPduProcessor.fillResponseData(view, response, 2);
 
