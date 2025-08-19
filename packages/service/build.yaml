@@ -1,9 +1,0 @@
-targets:
-  $default:
-    builders:
-      json_serializable:
-        options:
-          checked: true
-          any_map: true
-          field_rename: snake
-          disallow_unrecognized_keys: true

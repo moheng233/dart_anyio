@@ -3,6 +3,7 @@ import 'package:anyio_template/service.dart';
 final class DeviceImpl extends Device {
   DeviceImpl(this.deviceId);
 
+  @override
   final String deviceId;
 
   @override
@@ -11,27 +12,27 @@ final class DeviceImpl extends Device {
 
   @override
   // TODO: implement values
-  Map<String, PointValue> get values => throw UnimplementedError();
+  Map<String, Object?> get values => throw UnimplementedError();
 
   @override
-  Stream<PointValue> listen(String tagId) {
+  Stream<Object?> listen(String tagId) {
     // TODO: implement listen
     throw UnimplementedError();
   }
 
   @override
-  PointValue read(String tagId) {
+  Object? read(String tagId) {
     // TODO: implement read
     throw UnimplementedError();
   }
 
   @override
-  void write(String tagId, value) {
+  void write(String tagId, Object? value) {
     // TODO: implement write
   }
 
   @override
-  Future<bool> writeAsync(String tagid, value) {
+  Future<bool> writeAsync(String tagid, Object? value) {
     // TODO: implement writeAsync
     throw UnimplementedError();
   }

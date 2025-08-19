@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:anyio_modbus/modbus_client.dart';
 import 'package:anyio_template/service.dart';
 import 'package:anyio_template/util.dart';
-import 'package:dart_mappable/src/mappers/class_mapper.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 
 import 'template.dart';
 

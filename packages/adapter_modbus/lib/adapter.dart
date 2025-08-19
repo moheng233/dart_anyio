@@ -5,6 +5,8 @@ import 'package:anyio_template/src/logger.dart';
 
 import 'src/protocol.dart';
 
+export 'src/protocol.dart';
+
 final class AdapterPluginForModbus extends AdapterPluginBase {
   @override
   String get name => 'Modbus';
@@ -13,7 +15,7 @@ final class AdapterPluginForModbus extends AdapterPluginBase {
 
   @override
   Future<void> up(ChannelManager manager, Logger logger) async {
-    manager.registerFactory('modbus', ChannelFactoryForModbus());
+    manager.registerFactory(ChannelFactoryForModbus());
   }
 
   @override

@@ -11,7 +11,10 @@ final class ServiceOption with ServiceOptionMappable {
   final List<DeviceOption> devices;
 }
 
-base class TransportOptionBase {}
+@MappableClass(discriminatorKey: 'adapter')
+base class TransportOptionBase with TransportOptionBaseMappable {
+  const TransportOptionBase();
+}
 
 @MappableClass(discriminatorKey: 'adapter')
 base class ChannelOptionBase with ChannelOptionBaseMappable {
@@ -31,7 +34,6 @@ abstract class DeviceOption with DeviceOptionMappable {
   const DeviceOption({
     required this.name,
     required this.template,
-    required this.transport,
     required this.channelOption,
     required this.transportOption,
     this.displayName,
@@ -39,9 +41,8 @@ abstract class DeviceOption with DeviceOptionMappable {
 
   final String name;
   final String template;
-  final String transport;
-  final Map<dynamic, dynamic> channelOption;
-  final Map<dynamic, dynamic> transportOption;
+  final ChannelOptionBase channelOption;
+  final TransportOptionBase transportOption;
   final String? displayName;
 }
 

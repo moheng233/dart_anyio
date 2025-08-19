@@ -7,26 +7,26 @@ import 'template.dart';
 import 'transport.dart';
 
 abstract base class ChannelManager {
-  /// 注册 [channelType] 对应的 [ChannelFactory]
-  void registerFactory(String channelType, ChannelFactory channel);
+  /// 注册 [] 对应的 [ChannelFactory]
+  void registerFactory<
+    CP extends ChannelOptionBase,
+    TP extends ChannelTemplateBase,
+    S extends ChannelSessionBase<CP, TP>
+  >(ChannelFactoryBase<CP, TP, S> factory);
 
   /// 根据 [channelType] 获取对应的 [ChannelFactory]
-  ChannelFactory getFactory(String channelType);
+  ChannelFactory getFactory(Type channelType);
 
   /// 根据 [deviceId] 获取可以使用的 [ChannelSession]
   ChannelSession getSession(String deviceId);
 
   ChannelSession create(
-    String deviceId,
-    String channelType, {
+    String deviceId, {
     required Stream<DeviceBaseEvent> deviceEvent,
     required TransportSession transport,
     required ChannelOptionBase channelOption,
     required ChannelTemplateBase templateOption,
   });
-
-  dynamic loadChannelOption(String channelType, Map<dynamic, dynamic> json);
-  dynamic loadTemplateOption(String channelType, Map<dynamic, dynamic> json);
 }
 
 typedef ChannelSession =

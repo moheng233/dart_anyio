@@ -3,17 +3,16 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:anyio_template/service.dart';
-import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:dart_mappable/dart_mappable.dart';
+import 'package:meta/meta.dart';
 
-part 'tcp.g.dart';
+part 'tcp.mapper.dart';
 
 @immutable
-@JsonSerializable()
-final class TransportOptionForTcp {
+@MappableClass(discriminatorValue: 'tcp')
+final class TransportOptionForTcp extends TransportOptionBase
+    with TransportOptionForTcpMappable {
   const TransportOptionForTcp(this.host, this.port);
-
-  factory TransportOptionForTcp.fromJson(Map<dynamic, dynamic> json) =>
-      _$TransportOptionForTcpFromJson(json);
 
   final String host;
   final int port;
@@ -29,14 +28,13 @@ final class TransportFactoryForTcpImpl
   }
 
   @override
-  TransportOptionForTcp loadOption(Map<dynamic, dynamic> json) {
-    return TransportOptionForTcp.fromJson(json);
-  }
-
-  @override
   String getSessionId(TransportOptionForTcp option) {
     return 'tcp:${option.host}:${option.port}';
   }
+
+  @override
+  ClassMapperBase<TransportOptionForTcp> get optionMapper =>
+      TransportOptionForTcpMapper.ensureInitialized();
 }
 
 final class TransportForTcpImpl

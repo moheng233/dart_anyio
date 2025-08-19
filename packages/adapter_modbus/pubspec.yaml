@@ -20,6 +20,4 @@ dependencies:
   anyio_modbus: ^0.1.0
   anyio_template: ^1.0.0
   dart_mappable: ^4.6.0
-  freezed_annotation: ^3.0.0
-  json_annotation: ^4.9.0
   meta: ^1.17.0

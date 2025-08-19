@@ -1,11 +1,12 @@
+# yaml-language-server: $schema=schema/device.schema.json
 devices:
-  - name: test
-    template: test
-    transport: tcp
-    channel_option:
-      isRtu: false
+  - name: "test"
+    template: "test"
+    channelOption:
+      adapter: "modbus"
+      isRtu: true
       unitId: 1
-    transport_option:
-      host: 127.0.0.1
-      port: 8.8.8.8
-    
+    transportOption:
+      adapter: "tcp"
+      host: "127.0.0.1"
+      port: 8888

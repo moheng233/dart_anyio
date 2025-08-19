@@ -3,26 +3,27 @@ import 'dart:collection';
 import 'package:anyio_template/service.dart';
 
 final class ChannelManagerImpl extends ChannelManager {
-  final factorys = HashMap<String, ChannelFactory>();
+  final factorys = <ChannelFactory>{};
+
+  final channelOptionMap = <Type, ChannelFactory>{};
+  final templateOptionMap = <Type, ChannelFactory>{};
+  final sessionMap = <Type, ChannelFactory>{};
+
   final sessions = HashMap<String, ChannelSession>();
 
   @override
   ChannelSession create(
-    String deviceId,
-    String channelType, {
+    String deviceId, {
     required Stream<DeviceBaseEvent> deviceEvent,
     required TransportSession transport,
-    required dynamic channelOption,
-    required dynamic templateOption,
+    required ChannelOptionBase channelOption,
+    required ChannelTemplateBase templateOption,
   }) {
-    if (channelType.isEmpty) {
-      throw ArgumentError('channelType 不能为空');
-    }
     final existed = sessions[deviceId];
     if (existed != null) {
       return existed;
     }
-    final factory = getFactory(channelType);
+    final factory = channelOptionMap[channelOption.runtimeType]!;
     final session = factory.create(
       deviceId,
       deviceEvent: deviceEvent,
@@ -35,12 +36,8 @@ final class ChannelManagerImpl extends ChannelManager {
   }
 
   @override
-  ChannelFactory getFactory(String channelType) {
-    final factory = factorys[channelType];
-    if (factory == null) {
-      throw StateError('未注册的通道类型: $channelType');
-    }
-    return factory;
+  ChannelFactory getFactory(Type channelType) {
+    return sessionMap[channelType]!;
   }
 
   @override
@@ -53,20 +50,23 @@ final class ChannelManagerImpl extends ChannelManager {
   }
 
   @override
-  dynamic loadChannelOption(String channelType, Map<dynamic, dynamic> json) {
-    return getFactory(channelType).loadChannelOption(json);
-  }
-
-  @override
-  dynamic loadTemplateOption(String channelType, Map<dynamic, dynamic> json) {
-    return getFactory(channelType).loadTemplateOption(json);
-  }
-
-  @override
-  void registerFactory(String channelType, ChannelFactory channel) {
-    if (factorys.containsKey(channelType)) {
-      throw StateError('通道类型已注册: $channelType');
+  void registerFactory<
+    CP extends ChannelOptionBase,
+    TP extends ChannelTemplateBase,
+    S extends ChannelSessionBase<CP, TP>
+  >(ChannelFactoryBase<CP, TP, S> factory) {
+    if (factorys.contains(factory)) {
+      throw StateError('通道类型已注册: $factory');
     }
-    factorys[channelType] = channel;
+
+    factorys.add(factory);
+    channelOptionMap[CP] = factory;
+    templateOptionMap[TP] = factory;
+    sessionMap[S] = factory;
+
+    // 访问一下, 使其Mapper生效
+    factory
+      ..channelOptionMapper
+      ..templateOptionMapper;
   }
 }

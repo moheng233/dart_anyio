@@ -1,0 +1,139 @@
+{
+    "title": "ChannelTemplateBase",
+    "type": "object",
+    "properties": {
+        "name": {
+            "type": "string"
+        },
+        "version": {
+            "type": "string"
+        },
+        "adapter": {
+            "enumValues": [
+                "modbus"
+            ]
+        }
+    },
+    "required": [
+        "name",
+        "version",
+        "adapter"
+    ],
+    "definitions": {
+        "ModbusPoint": {
+            "type": "object",
+            "properties": {
+                "tag": {
+                    "type": "string"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "scale": {
+                    "type": "number",
+                    "default": 1.0
+                },
+                "length": {
+                    "type": "integer",
+                    "default": 1
+                },
+                "endian": {
+                    "type": "string",
+                    "enumValues": [
+                        "abcd",
+                        "dcba",
+                        "badc",
+                        "cdab"
+                    ],
+                    "default": "dcba"
+                },
+                "type": {
+                    "type": "string",
+                    "enumValues": [
+                        "bool",
+                        "int",
+                        "uint",
+                        "float"
+                    ],
+                    "default": "uint"
+                },
+                "access": {
+                    "type": "string",
+                    "enumValues": [
+                        "r",
+                        "rw",
+                        "w"
+                    ],
+                    "default": "r"
+                }
+            },
+            "required": [
+                "tag",
+                "offset"
+            ]
+        },
+        "ModbusPoll": {
+            "type": "object",
+            "properties": {
+                "intervalTime": {
+                    "type": "integer"
+                },
+                "function": {
+                    "type": "integer"
+                },
+                "begin": {
+                    "type": "integer"
+                },
+                "length": {
+                    "type": "integer"
+                },
+                "points": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ModbusPoint"
+                    }
+                }
+            },
+            "required": [
+                "intervalTime",
+                "function",
+                "begin",
+                "length",
+                "points"
+            ]
+        },
+        "ChannelTemplateForModbus": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "polls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ModbusPoll"
+                    }
+                },
+                "adapter": {
+                    "enumValues": [
+                        "modbus"
+                    ]
+                }
+            },
+            "required": [
+                "name",
+                "version",
+                "polls",
+                "adapter"
+            ]
+        }
+    },
+    "oneOf": [
+        {
+            "$ref": "#/definitions/ChannelTemplateForModbus"
+        }
+    ]
+}

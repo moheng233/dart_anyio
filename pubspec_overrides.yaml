@@ -1,0 +1,16 @@
+dependency_overrides:
+  dart_mappable: 
+    git: 
+      url: https://github.com/moheng233/dart_mappable.git
+      ref: feat/generate-json-schema
+      path: packages/dart_mappable
+  dart_mappable_schema:
+    git: 
+      url: https://github.com/moheng233/dart_mappable.git
+      ref: feat/generate-json-schema
+      path: packages/dart_mappable_schema
+  dart_mappable_builder:
+    git: 
+      url: https://github.com/moheng233/dart_mappable.git
+      ref: feat/generate-json-schema
+      path: packages/dart_mappable_builder

@@ -9,6 +9,6 @@ abstract class Device {
   Object? read(String tagId);
   Stream<Object?> listen(String tagId);
 
-  void write(String tagId, dynamic value);
-  Future<bool> writeAsync(String tagid, dynamic value);
+  void write(String tagId, Object? value);
+  Future<bool> writeAsync(String tagid, Object? value);
 }

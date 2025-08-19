@@ -37,7 +37,7 @@ enum ModbusAccessType {
   final bool write;
 }
 
-@MappableClass(discriminatorKey: 'adapter', discriminatorValue: 'modbus')
+@MappableClass(discriminatorValue: 'modbus')
 final class ChannelOptionForModbus extends ChannelOptionBase
     with ChannelOptionForModbusMappable {
   const ChannelOptionForModbus({
@@ -49,7 +49,7 @@ final class ChannelOptionForModbus extends ChannelOptionBase
   final int unitId;
 }
 
-@MappableClass(discriminatorKey: 'adapter', discriminatorValue: 'modbus')
+@MappableClass(discriminatorValue: 'modbus')
 final class ChannelTemplateForModbus extends ChannelTemplateBase
     with ChannelTemplateForModbusMappable {
   const ChannelTemplateForModbus(
