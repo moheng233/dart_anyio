@@ -52,9 +52,7 @@ final class ChannelOptionForModbus extends ChannelOptionBase
 @MappableClass(discriminatorValue: 'modbus')
 final class ChannelTemplateForModbus extends ChannelTemplateBase
     with ChannelTemplateForModbusMappable {
-  const ChannelTemplateForModbus(
-    super.name,
-    super.version, {
+  const ChannelTemplateForModbus({
     required this.polls,
   });
 

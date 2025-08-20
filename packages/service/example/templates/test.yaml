@@ -9,4 +9,4 @@ polls:
     intervalTime: 2000
     points:
       - { tag: "n1", offset: 0, type: int, length: 2, endian: abcd }
-      - { tag: "n2", offset: 2, type: float, length: 2, endian: bcda }
+      - { tag: "n2", offset: 2, type: int, length: 2, endian: dcba }

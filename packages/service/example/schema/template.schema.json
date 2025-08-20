@@ -1,23 +1,14 @@
 {
+    "$schema": "http://json-schema.org/draft-07/schema",
     "title": "ChannelTemplateBase",
     "type": "object",
-    "properties": {
-        "name": {
-            "type": "string"
+    "oneOf": [
+        {
+            "$ref": "#/definitions/ChannelTemplateForCan"
         },
-        "version": {
-            "type": "string"
-        },
-        "adapter": {
-            "enumValues": [
-                "modbus"
-            ]
+        {
+            "$ref": "#/definitions/ChannelTemplateForModbus"
         }
-    },
-    "required": [
-        "name",
-        "version",
-        "adapter"
     ],
     "definitions": {
         "ModbusPoint": {
@@ -39,7 +30,7 @@
                 },
                 "endian": {
                     "type": "string",
-                    "enumValues": [
+                    "enum": [
                         "abcd",
                         "dcba",
                         "badc",
@@ -49,7 +40,7 @@
                 },
                 "type": {
                     "type": "string",
-                    "enumValues": [
+                    "enum": [
                         "bool",
                         "int",
                         "uint",
@@ -70,7 +61,8 @@
             "required": [
                 "tag",
                 "offset"
-            ]
+            ],
+            "additionalProperties": false
         },
         "ModbusPoll": {
             "type": "object",
@@ -100,11 +92,15 @@
                 "begin",
                 "length",
                 "points"
-            ]
+            ],
+            "additionalProperties": false
         },
         "ChannelTemplateForModbus": {
             "type": "object",
             "properties": {
+                "adapter": {
+                    "const": "modbus"
+                },
                 "name": {
                     "type": "string"
                 },
@@ -116,24 +112,36 @@
                     "items": {
                         "$ref": "#/definitions/ModbusPoll"
                     }
-                },
-                "adapter": {
-                    "enumValues": [
-                        "modbus"
-                    ]
                 }
             },
             "required": [
                 "name",
                 "version",
-                "polls",
+                "adapter",
+                "polls"
+            ],
+            "additionalProperties": false
+        },
+        "ChannelTemplateForCan": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "adapter": {
+                    "const": "can"
+                }
+            },
+            "required": [
+                "name",
+                "version",
                 "adapter"
-            ]
+            ],
+            "additionalProperties": false
         }
     },
-    "oneOf": [
-        {
-            "$ref": "#/definitions/ChannelTemplateForModbus"
-        }
-    ]
+    "additionalProperties": true
 }
