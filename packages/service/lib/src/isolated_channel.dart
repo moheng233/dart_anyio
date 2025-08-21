@@ -3,6 +3,8 @@ import 'dart:isolate';
 
 import 'package:anyio_template/service.dart';
 
+import 'logging/logging.dart';
+
 /// Message types for inter-isolate communication
 abstract class IsolateMessage {
   const IsolateMessage();
@@ -51,6 +53,29 @@ class ChannelEventMessage extends IsolateMessage {
   final String eventType;
 }
 
+/// Performance metric from isolated channel
+class PerformanceMetricMessage extends IsolateMessage {
+  const PerformanceMetricMessage({
+    required this.deviceId,
+    required this.operationType,
+    required this.durationMicroseconds,
+    required this.timestampMillis,
+    required this.success,
+    this.details,
+    this.pollUnitIndex,
+    this.pollCycleId,
+  });
+
+  final String deviceId;
+  final String operationType; // PerformanceOperationType as string
+  final int durationMicroseconds;
+  final int timestampMillis;
+  final bool success;
+  final Map<String, dynamic>? details;
+  final int? pollUnitIndex;
+  final String? pollCycleId;
+}
+
 /// Error message from isolated channel
 class ChannelErrorMessage extends IsolateMessage {
   const ChannelErrorMessage(this.error, this.stackTrace);
@@ -74,6 +99,8 @@ class IsolatedChannelSession extends ChannelSessionBase<ChannelOptionBase, Chann
     required Stream<DeviceBaseEvent> deviceEvent,
   }) : super(write: deviceEvent) {
     _deviceEventSubscription = write.listen(_handleDeviceEvent);
+    _logger = LoggingManager.instance.logger;
+    _performanceMonitor = LoggingManager.instance.performanceMonitor;
   }
 
   final String deviceId;
@@ -81,6 +108,9 @@ class IsolatedChannelSession extends ChannelSessionBase<ChannelOptionBase, Chann
   final ChannelOptionBase channelOption;
   final ChannelTemplateBase templateOption;
   final TransportSession transport;
+
+  late final Logger _logger;
+  late final PerformanceMonitor _performanceMonitor;
 
   Isolate? _isolate;
   SendPort? _isolateSendPort;
@@ -97,12 +127,16 @@ class IsolatedChannelSession extends ChannelSessionBase<ChannelOptionBase, Chann
   @override
   void open() {
     if (_isRunning) return;
+    
+    _logger.info('Opening isolated channel', deviceId: deviceId);
     _startIsolate();
   }
 
   @override
   void stop() {
     if (!_isRunning) return;
+    
+    _logger.info('Stopping isolated channel', deviceId: deviceId);
     _stopIsolate();
   }
 
@@ -111,17 +145,34 @@ class IsolatedChannelSession extends ChannelSessionBase<ChannelOptionBase, Chann
     if (_isRestarting) return;
     _isRestarting = true;
     
+    final restartTimer = _performanceMonitor.startRestartTimer(deviceId);
+    
     try {
+      _logger.warn('Restarting isolated channel', deviceId: deviceId);
       _stopIsolate();
       await Future.delayed(const Duration(milliseconds: 500));
       _startIsolate();
+      
+      restartTimer.complete();
+      _logger.info('Isolated channel restart completed', deviceId: deviceId);
+    } catch (e, stackTrace) {
+      restartTimer.fail();
+      _logger.error('Isolated channel restart failed', 
+                   deviceId: deviceId, 
+                   error: e, 
+                   stackTrace: stackTrace);
+      rethrow;
     } finally {
       _isRestarting = false;
     }
   }
 
   void _startIsolate() async {
+    final startupTimer = _performanceMonitor.startStartupTimer(deviceId);
+    
     try {
+      _logger.debug('Creating isolate for channel', deviceId: deviceId);
+      
       // Create receive port for communication
       _isolateReceivePort = ReceivePort();
       
@@ -143,18 +194,36 @@ class IsolatedChannelSession extends ChannelSessionBase<ChannelOptionBase, Chann
       );
 
       _isRunning = true;
-    } catch (e) {
+      startupTimer.complete();
+      _logger.info('Isolate created successfully', deviceId: deviceId);
+    } catch (e, stackTrace) {
+      startupTimer.fail();
+      _logger.error('Failed to start isolated channel', 
+                   deviceId: deviceId, 
+                   error: e, 
+                   stackTrace: stackTrace);
       _readController.addError('Failed to start isolated channel: $e');
       _cleanupIsolate();
     }
   }
 
   void _stopIsolate() {
-    if (_isolateSendPort != null) {
-      _isolateSendPort!.send(const StopChannelMessage());
-    }
+    final shutdownTimer = _performanceMonitor.startShutdownTimer(deviceId);
     
-    _cleanupIsolate();
+    try {
+      _logger.debug('Stopping isolate', deviceId: deviceId);
+      
+      if (_isolateSendPort != null) {
+        _isolateSendPort!.send(const StopChannelMessage());
+      }
+      
+      _cleanupIsolate();
+      shutdownTimer.complete();
+      _logger.debug('Isolate stopped', deviceId: deviceId);
+    } catch (e) {
+      shutdownTimer.fail();
+      _logger.warn('Error during isolate shutdown', deviceId: deviceId, error: e);
+    }
   }
 
   void _cleanupIsolate() {
@@ -170,6 +239,7 @@ class IsolatedChannelSession extends ChannelSessionBase<ChannelOptionBase, Chann
     if (message is SendPort) {
       // Isolate is ready, save send port and initialize
       _isolateSendPort = message;
+      _logger.debug('Isolate ready, initializing channel', deviceId: deviceId);
       _initializeChannel();
     } else if (message is ChannelEventMessage) {
       // Reconstruct channel event from JSON
@@ -177,8 +247,16 @@ class IsolatedChannelSession extends ChannelSessionBase<ChannelOptionBase, Chann
       if (event != null) {
         _readController.add(event);
       }
+    } else if (message is PerformanceMetricMessage) {
+      // Forward performance metric to monitor
+      _handlePerformanceMetric(message);
     } else if (message is ChannelErrorMessage) {
       // Handle channel error
+      _logger.error('Channel error in isolate', 
+                   deviceId: deviceId, 
+                   error: message.error,
+                   context: {'isolate_error': true});
+      
       _readController.addError(
         'Channel error: ${message.error}',
         message.stackTrace != null ? StackTrace.fromString(message.stackTrace!) : null,
@@ -188,6 +266,9 @@ class IsolatedChannelSession extends ChannelSessionBase<ChannelOptionBase, Chann
       restart();
     } else if (message == null) {
       // Isolate exited
+      _logger.fatal('Channel isolate exited unexpectedly', 
+                   deviceId: deviceId,
+                   context: {'isolate_crash': true});
       _readController.addError('Channel isolate exited unexpectedly');
       restart();
     }
@@ -195,6 +276,8 @@ class IsolatedChannelSession extends ChannelSessionBase<ChannelOptionBase, Chann
 
   void _initializeChannel() {
     if (_isolateSendPort == null) return;
+
+    _logger.debug('Sending initialization message', deviceId: deviceId);
 
     // Send initialization message
     final initMessage = InitChannelMessage(
@@ -210,18 +293,50 @@ class IsolatedChannelSession extends ChannelSessionBase<ChannelOptionBase, Chann
     
     // Start channel
     _isolateSendPort!.send(const StartChannelMessage());
+    _logger.info('Channel initialization sent', deviceId: deviceId);
   }
 
   void _handleDeviceEvent(DeviceBaseEvent event) {
     if (_isolateSendPort != null) {
       final serialized = _serializeDeviceEvent(event);
       if (serialized != null) {
+        _logger.trace('Forwarding device event to isolate', 
+                     deviceId: deviceId,
+                     context: {'event_type': serialized['type']});
+        
         _isolateSendPort!.send(DeviceEventMessage(
           serialized['json'] as Map<String, dynamic>,
           serialized['type'] as String,
         ));
       }
     }
+  }
+
+  void _handlePerformanceMetric(PerformanceMetricMessage message) {
+    // Convert back to PerformanceOperationType
+    PerformanceOperationType? operationType;
+    for (final type in PerformanceOperationType.values) {
+      if (type.toString() == message.operationType) {
+        operationType = type;
+        break;
+      }
+    }
+    
+    if (operationType == null) return;
+    
+    // Reconstruct PerformanceMetric
+    final metric = PerformanceMetric(
+      deviceId: message.deviceId,
+      operationType: operationType,
+      duration: Duration(microseconds: message.durationMicroseconds),
+      timestamp: DateTime.fromMillisecondsSinceEpoch(message.timestampMillis),
+      success: message.success,
+      details: message.details,
+      pollUnitIndex: message.pollUnitIndex,
+      pollCycleId: message.pollCycleId,
+    );
+    
+    _performanceMonitor.recordMetric(metric);
   }
 
   Map<String, dynamic> _serializeChannelOption(ChannelOptionBase option) {
@@ -292,9 +407,13 @@ class IsolatedChannelSession extends ChannelSessionBase<ChannelOptionBase, Chann
 
   /// Dispose resources
   Future<void> dispose() async {
+    _logger.debug('Disposing isolated channel', deviceId: deviceId);
+    
     await _deviceEventSubscription?.cancel();
     _stopIsolate();
     await _readController.close();
+    
+    _logger.debug('Isolated channel disposed', deviceId: deviceId);
   }
 
   /// Entry point for the isolated channel
@@ -356,7 +475,11 @@ class IsolatedChannelWorker {
     required this.channelOptionType,
     required this.templateOptionType,
     required this.transportData,
-  });
+  }) {
+    // Initialize simple console logging for isolate
+    _logger = ConsoleLogger(globalLevel: LogLevel.info);
+    _performanceMonitor = PerformanceMonitor();
+  }
 
   final SendPort mainSendPort;
   final ChannelFactory channelFactory;
@@ -367,48 +490,186 @@ class IsolatedChannelWorker {
   final String templateOptionType;
   final Map<String, dynamic> transportData;
 
+  late final Logger _logger;
+  late final PerformanceMonitor _performanceMonitor;
+
   ChannelSession? _actualChannelSession;
   StreamSubscription<ChannelBaseEvent>? _channelSubscription;
   StreamController<DeviceBaseEvent>? _deviceEventController;
+  Timer? _pollTimer;
 
   void start() {
+    final startupTimer = _performanceMonitor.startStartupTimer(deviceId);
+    
     try {
+      _logger.info('Starting isolated channel worker', deviceId: deviceId);
+      
       // For now, simulate a working channel since we'd need full transport recreation
       // In a real implementation, you'd recreate the transport and full channel here
       _simulateChannelEvents();
+      
+      startupTimer.complete();
+      _logger.info('Isolated channel worker started successfully', deviceId: deviceId);
     } catch (e, stackTrace) {
+      startupTimer.fail();
+      _logger.error('Failed to start isolated channel worker', 
+                   deviceId: deviceId, 
+                   error: e, 
+                   stackTrace: stackTrace);
       mainSendPort.send(ChannelErrorMessage(e.toString(), stackTrace.toString()));
     }
   }
 
   void stop() {
-    _channelSubscription?.cancel();
-    _deviceEventController?.close();
-    _actualChannelSession?.stop();
+    final shutdownTimer = _performanceMonitor.startShutdownTimer(deviceId);
+    
+    try {
+      _logger.info('Stopping isolated channel worker', deviceId: deviceId);
+      
+      _pollTimer?.cancel();
+      _channelSubscription?.cancel();
+      _deviceEventController?.close();
+      _actualChannelSession?.stop();
+      
+      shutdownTimer.complete();
+      _logger.info('Isolated channel worker stopped', deviceId: deviceId);
+    } catch (e) {
+      shutdownTimer.fail();
+      _logger.warn('Error during worker shutdown', deviceId: deviceId, error: e);
+    }
   }
 
   void handleDeviceEvent(Map<String, dynamic> eventJson, String eventType) {
-    // Handle device events in the isolated channel
-    // For now, just log them
-    print('Isolated channel received device event: $eventType');
+    final writeTimer = _performanceMonitor.startWriteTimer(deviceId, 
+        details: {'event_type': eventType});
+    
+    try {
+      _logger.debug('Handling device event', 
+                   deviceId: deviceId,
+                   context: {'event_type': eventType});
+      
+      // Handle device events in the isolated channel
+      // For now, just log them
+      // In a real implementation, this would forward to the actual channel
+      
+      writeTimer.complete();
+    } catch (e) {
+      writeTimer.fail();
+      _logger.error('Error handling device event', 
+                   deviceId: deviceId, 
+                   error: e,
+                   context: {'event_type': eventType});
+    }
   }
 
   void _simulateChannelEvents() {
     // This is a placeholder - in real implementation, this would be the actual channel
-    Timer.periodic(const Duration(seconds: 2), (timer) {
-      // Send simulated channel update event
-      final eventJson = {
-        'deviceId': deviceId,
-        'updates': [
-          {
-            'deviceId': deviceId,
-            'tagId': 'status',
-            'value': DateTime.now().millisecondsSinceEpoch % 100,
-          }
-        ],
-      };
+    var pollCycleCounter = 0;
+    
+    _pollTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
+      final pollCycleId = 'cycle_${pollCycleCounter++}';
+      final pollTimer = _performanceMonitor.startPollTimer(deviceId, pollCycleId: pollCycleId);
       
-      mainSendPort.send(ChannelEventMessage(eventJson, 'ChannelUpdateEvent'));
+      try {
+        _logger.trace('Starting poll cycle', 
+                     deviceId: deviceId,
+                     context: {'poll_cycle_id': pollCycleId});
+        
+        // Simulate poll units within the cycle
+        _simulatePollUnits(pollCycleId);
+        
+        // Send simulated channel update event
+        final eventJson = {
+          'deviceId': deviceId,
+          'updates': [
+            {
+              'deviceId': deviceId,
+              'tagId': 'status',
+              'value': DateTime.now().millisecondsSinceEpoch % 100,
+            }
+          ],
+        };
+        
+        mainSendPort.send(ChannelEventMessage(eventJson, 'ChannelUpdateEvent'));
+        
+        pollTimer.complete();
+        _logger.trace('Poll cycle completed', 
+                     deviceId: deviceId,
+                     context: {'poll_cycle_id': pollCycleId});
+        
+        // Send performance metrics to main isolate
+        _sendPerformanceMetrics();
+        
+      } catch (e) {
+        pollTimer.fail();
+        _logger.error('Poll cycle failed', 
+                     deviceId: deviceId, 
+                     error: e,
+                     context: {'poll_cycle_id': pollCycleId});
+      }
     });
+  }
+
+  void _simulatePollUnits(String pollCycleId) {
+    // Simulate multiple poll units within a cycle
+    for (int i = 0; i < 3; i++) {
+      final pollUnitTimer = _performanceMonitor.startPollUnitTimer(
+        deviceId, 
+        i, 
+        pollCycleId: pollCycleId
+      );
+      
+      try {
+        // Simulate some work with busy waiting to measure actual time
+        final startTime = DateTime.now();
+        final targetDuration = Duration(milliseconds: 10 + (i * 5));
+        
+        // Simple busy wait simulation
+        while (DateTime.now().difference(startTime) < targetDuration) {
+          // Simulate processing work
+        }
+        
+        pollUnitTimer.complete();
+        _logger.trace('Poll unit completed', 
+                     deviceId: deviceId,
+                     context: {
+                       'poll_cycle_id': pollCycleId,
+                       'poll_unit_index': i,
+                       'target_duration_ms': targetDuration.inMilliseconds,
+                     });
+      } catch (e) {
+        pollUnitTimer.fail();
+        _logger.warn('Poll unit failed', 
+                    deviceId: deviceId, 
+                    error: e,
+                    context: {
+                      'poll_cycle_id': pollCycleId,
+                      'poll_unit_index': i,
+                    });
+      }
+    }
+  }
+
+  void _sendPerformanceMetrics() {
+    // Send recent performance metrics to main isolate
+    final recentMetrics = _performanceMonitor.getRecentMetrics(deviceId, limit: 10);
+    
+    for (final metric in recentMetrics) {
+      final message = PerformanceMetricMessage(
+        deviceId: metric.deviceId,
+        operationType: metric.operationType.toString(),
+        durationMicroseconds: metric.duration.inMicroseconds,
+        timestampMillis: metric.timestamp.millisecondsSinceEpoch,
+        success: metric.success,
+        details: metric.details,
+        pollUnitIndex: metric.pollUnitIndex,
+        pollCycleId: metric.pollCycleId,
+      );
+      
+      mainSendPort.send(message);
+    }
+    
+    // Clear sent metrics to avoid duplicate sending
+    _performanceMonitor.clearDeviceMetrics(deviceId);
   }
 }
