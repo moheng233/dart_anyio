@@ -33,9 +33,9 @@ Future<void> main(List<String> args) async {
   print('Template directory: ${templateDirectory.path}');
   print('HTTP API port: $httpPort');
 
-  // Initialize managers
+  // Initialize managers with isolated channels enabled
   final transportManager = TransportManagerImpl();
-  final channelManager = ChannelManagerImpl();
+  final channelManager = ChannelManagerImpl(useIsolatedChannels: true);
 
   // Register transport factories
   transportManager.register(TransportFactoryForTcpImpl());
@@ -43,10 +43,13 @@ Future<void> main(List<String> args) async {
   // Register channel factories
   channelManager.registerFactory(ChannelFactoryForModbus());
 
-  // Create service manager
+  // Create service manager with channel restart enabled
   final serviceManager = ServiceManager(
     channelManager: channelManager,
     transportManager: transportManager,
+    enableChannelRestart: true,
+    maxRestartAttempts: 3,
+    restartDelaySeconds: 5,
   );
 
   // Initialize time-series database
@@ -98,7 +101,7 @@ Future<void> main(List<String> args) async {
     print('Starting HTTP API server...');
     unawaited(httpServer.start());
 
-    print('AnyIO Service started successfully!');
+    print('AnyIO Service started successfully with isolated channels!');
     print('Available endpoints:');
     print('  GET  http://localhost:$httpPort/health');
     print('  GET  http://localhost:$httpPort/devices');
@@ -109,6 +112,10 @@ Future<void> main(List<String> args) async {
     print('  POST http://localhost:$httpPort/devices/{deviceId}/write');
     print('  GET  http://localhost:$httpPort/history/{deviceId}[/{pointId}]?start=...&end=...&limit=...');
     print('  GET  http://localhost:$httpPort/stats');
+    print('');
+    print('Channel isolation: ENABLED (channels run in separate isolates)');
+    print('Auto-restart: ENABLED (max 3 attempts, 5s delay)');
+    print('Channel restart stats: ${serviceManager.getRestartStats()}');
 
     // Handle shutdown gracefully
     ProcessSignal.sigint.watch().listen((_) async {

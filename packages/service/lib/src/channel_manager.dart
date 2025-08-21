@@ -2,7 +2,14 @@ import 'dart:collection';
 
 import 'package:anyio_template/service.dart';
 
+import 'isolated_channel.dart';
+
 final class ChannelManagerImpl extends ChannelManager {
+  ChannelManagerImpl({this.useIsolatedChannels = true});
+
+  /// Whether to run channels in separate isolates
+  final bool useIsolatedChannels;
+
   final factorys = <ChannelFactory>{};
 
   final channelOptionMap = <Type, ChannelFactory>{};
@@ -10,6 +17,7 @@ final class ChannelManagerImpl extends ChannelManager {
   final sessionMap = <Type, ChannelFactory>{};
 
   final sessions = HashMap<String, ChannelSession>();
+  final isolatedSessions = HashMap<String, IsolatedChannelSession>();
 
   @override
   ChannelSession create(
@@ -23,14 +31,35 @@ final class ChannelManagerImpl extends ChannelManager {
     if (existed != null) {
       return existed;
     }
+
     final factory = channelOptionMap[channelOption.runtimeType]!;
-    final session = factory.create(
-      deviceId,
-      deviceEvent: deviceEvent,
-      transport: transport,
-      channelOption: channelOption,
-      templateOption: templateOption,
-    );
+    
+    ChannelSession session;
+    
+    if (useIsolatedChannels) {
+      // Create isolated channel session
+      final isolatedSession = IsolatedChannelSession(
+        deviceId: deviceId,
+        channelFactory: factory,
+        channelOption: channelOption,
+        templateOption: templateOption,
+        transport: transport,
+        deviceEvent: deviceEvent,
+      );
+      
+      isolatedSessions[deviceId] = isolatedSession;
+      session = isolatedSession;
+    } else {
+      // Create regular channel session
+      session = factory.create(
+        deviceId,
+        deviceEvent: deviceEvent,
+        transport: transport,
+        channelOption: channelOption,
+        templateOption: templateOption,
+      );
+    }
+    
     sessions[deviceId] = session;
     return session;
   }
@@ -47,6 +76,37 @@ final class ChannelManagerImpl extends ChannelManager {
       throw StateError('会话不存在: $deviceId');
     }
     return session;
+  }
+
+  /// Get isolated channel session for restart operations
+  IsolatedChannelSession? getIsolatedSession(String deviceId) {
+    return isolatedSessions[deviceId];
+  }
+
+  /// Restart an isolated channel
+  Future<void> restartChannel(String deviceId) async {
+    final isolatedSession = isolatedSessions[deviceId];
+    if (isolatedSession != null) {
+      await isolatedSession.restart();
+    }
+  }
+
+  /// Stop and cleanup all channels
+  Future<void> stopAll() async {
+    // Stop all isolated channels
+    for (final session in isolatedSessions.values) {
+      await session.dispose();
+    }
+    
+    // Stop regular channels
+    for (final session in sessions.values) {
+      if (session is! IsolatedChannelSession) {
+        session.stop();
+      }
+    }
+    
+    sessions.clear();
+    isolatedSessions.clear();
   }
 
   @override

@@ -9,6 +9,7 @@ import 'package:path/path.dart' as path;
 
 import 'channel_manager.dart';
 import 'device.dart';
+import 'isolated_channel.dart';
 import 'transport_manager.dart';
 
 /// Service gateway manager that orchestrates the entire system
@@ -16,14 +17,28 @@ final class ServiceManager {
   ServiceManager({
     required this.channelManager,
     required this.transportManager,
+    this.enableChannelRestart = true,
+    this.maxRestartAttempts = 3,
+    this.restartDelaySeconds = 5,
   });
 
   final ChannelManager channelManager;
   final TransportManager transportManager;
+  
+  /// Whether to automatically restart failed channels
+  final bool enableChannelRestart;
+  
+  /// Maximum number of restart attempts per channel
+  final int maxRestartAttempts;
+  
+  /// Delay between restart attempts (seconds)
+  final int restartDelaySeconds;
 
   final _devices = HashMap<String, DeviceImpl>();
   final _channelSessions = HashMap<String, ChannelSession>();
   final _deviceEventControllers = HashMap<String, StreamController<DeviceBaseEvent>>();
+  final _channelErrorSubscriptions = HashMap<String, StreamSubscription>();
+  final _restartAttempts = HashMap<String, int>();
   
   bool _isRunning = false;
 
@@ -72,9 +87,25 @@ final class ServiceManager {
   Future<void> stop() async {
     if (!_isRunning) return;
 
-    // Stop all channel sessions
-    for (final session in _channelSessions.values) {
-      session.stop();
+    // Cancel all error subscriptions
+    for (final subscription in _channelErrorSubscriptions.values) {
+      await subscription.cancel();
+    }
+    _channelErrorSubscriptions.clear();
+
+    // Stop all devices
+    for (final device in _devices.values) {
+      await device.dispose();
+    }
+
+    // Stop channel manager (handles both regular and isolated channels)
+    if (channelManager is ChannelManagerImpl) {
+      await (channelManager as ChannelManagerImpl).stopAll();
+    } else {
+      // Fallback for regular channel sessions
+      for (final session in _channelSessions.values) {
+        session.stop();
+      }
     }
 
     // Close all device event controllers
@@ -85,6 +116,7 @@ final class ServiceManager {
     _channelSessions.clear();
     _deviceEventControllers.clear();
     _devices.clear();
+    _restartAttempts.clear();
     _isRunning = false;
   }
 
@@ -99,6 +131,59 @@ final class ServiceManager {
 
   /// Get channel session for device
   ChannelSession? getChannelSession(String deviceId) => _channelSessions[deviceId];
+
+  /// Manually restart a channel
+  Future<bool> restartChannel(String deviceId) async {
+    if (!_isRunning) return false;
+
+    if (channelManager is ChannelManagerImpl) {
+      try {
+        await (channelManager as ChannelManagerImpl).restartChannel(deviceId);
+        _restartAttempts[deviceId] = 0; // Reset attempts on successful restart
+        return true;
+      } catch (e) {
+        print('Failed to restart channel $deviceId: $e');
+        return false;
+      }
+    }
+    return false;
+  }
+
+  /// Get restart statistics
+  Map<String, int> getRestartStats() => Map.unmodifiable(_restartAttempts);
+
+  void _setupChannelErrorHandling(String deviceId, ChannelSession channelSession) {
+    if (!enableChannelRestart) return;
+
+    // Listen for channel errors for auto-restart
+    final subscription = channelSession.read.handleError((error, stackTrace) {
+      _handleChannelError(deviceId, error, stackTrace);
+    }).listen(null);
+
+    _channelErrorSubscriptions[deviceId] = subscription;
+  }
+
+  void _handleChannelError(String deviceId, dynamic error, StackTrace? stackTrace) async {
+    print('Channel error for device $deviceId: $error');
+
+    final attempts = _restartAttempts[deviceId] ?? 0;
+    if (attempts >= maxRestartAttempts) {
+      print('Max restart attempts reached for channel $deviceId');
+      return;
+    }
+
+    _restartAttempts[deviceId] = attempts + 1;
+
+    // Wait before attempting restart
+    await Future.delayed(Duration(seconds: restartDelaySeconds));
+
+    final success = await restartChannel(deviceId);
+    if (success) {
+      print('Successfully restarted channel $deviceId (attempt ${attempts + 1})');
+    } else {
+      print('Failed to restart channel $deviceId (attempt ${attempts + 1})');
+    }
+  }
 
   Future<void> _startDevice(DeviceOption deviceConfig, Map<String, TemplateOption> templates) async {
     final template = templates[deviceConfig.template];
@@ -137,6 +222,9 @@ final class ServiceManager {
 
     // Start channel session
     channelSession.open();
+    
+    // Setup error handling for channel restarts
+    _setupChannelErrorHandling(deviceConfig.name, channelSession);
     
     // Start listening to channel events
     device.startListening();
