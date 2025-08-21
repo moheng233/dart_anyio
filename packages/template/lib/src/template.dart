@@ -1,4 +1,9 @@
+@MappableLib(caseStyle: CaseStyle.snakeCase)
+library;
+
 import 'package:dart_mappable/dart_mappable.dart';
+
+import 'point.dart';
 
 part 'template.mapper.dart';
 
@@ -15,13 +20,15 @@ final class ServiceOption with ServiceOptionMappable {
 final class TemplateOption with TemplateOptionMappable {
   const TemplateOption({
     required this.info,
-    required this.meta,
-    required this.tempate,
+    required this.template,
+    required this.points,
+    this.meta = const {},
   });
 
   final ChannelTempateInfo info;
-  final Map<String, dynamic> meta;
-  final ChannelTemplateBase tempate;
+  final Map<String, Object?> meta;
+  final ChannelTemplateBase template;
+  final Map<String, PointInfo> points;
 }
 
 @MappableClass(discriminatorKey: 'type')
@@ -53,13 +60,14 @@ final class ChannelTempateInfo with ChannelTempateInfoMappable {
 }
 
 @MappableClass()
-abstract class DeviceOption with DeviceOptionMappable {
+final class DeviceOption with DeviceOptionMappable {
   const DeviceOption({
     required this.name,
     required this.template,
     required this.channel,
     required this.transportOption,
     this.displayName,
+    this.meta = const {},
   });
 
   final String name;
@@ -67,13 +75,5 @@ abstract class DeviceOption with DeviceOptionMappable {
   final ChannelOptionBase channel;
   final TransportOptionBase transportOption;
   final String? displayName;
-}
-
-@MappableClass()
-abstract class PointInfo with PointInfoMappable {
-  const PointInfo({required this.tag, this.displayName, this.detailed});
-
-  final String tag;
-  final String? displayName;
-  final String? detailed;
+  final Map<String, Object?> meta;
 }

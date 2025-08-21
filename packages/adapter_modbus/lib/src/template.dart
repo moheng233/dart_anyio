@@ -1,3 +1,6 @@
+@MappableLib(caseStyle: CaseStyle.snakeCase)
+library;
+
 import 'dart:typed_data';
 
 import 'package:anyio_template/service.dart';
@@ -62,24 +65,24 @@ final class ChannelTemplateForModbus extends ChannelTemplateBase
 @MappableClass()
 final class ModbusPoll with ModbusPollMappable {
   const ModbusPoll({
-    required this.intervalTime,
+    required this.intervalMs,
     required this.function,
     required this.begin,
     required this.length,
-    required this.points,
+    required this.mapping,
   });
 
-  final int intervalTime;
+  final int intervalMs;
   final int function;
   final int begin;
   final int length;
-  final List<ModbusPoint> points;
+  final List<ModbusPoint> mapping;
 }
 
 @MappableClass()
 final class ModbusPoint with ModbusPointMappable {
   const ModbusPoint({
-    required this.tag,
+    required this.to,
     required this.offset,
     this.scale = 1,
     this.length = 1,
@@ -88,7 +91,7 @@ final class ModbusPoint with ModbusPointMappable {
     this.access = ModbusAccessType.r,
   });
 
-  final String tag;
+  final String to;
   final int offset;
   final double scale;
   final int length;

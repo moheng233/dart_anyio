@@ -70,42 +70,47 @@ final class ChannelSessionForModbus
             poll.length,
           );
       }
-    } on Exception {
-      // ...existing code...
+    } on Exception catch (_) {}
+    if (reads == null) {
+      readController.add(
+        ChannelUpdateEvent(
+          deviceId,
+          poll.mapping
+              .map((e) => Point(deviceId, e.to, null))
+              .toList(growable: true),
+        ),
+      );
+      return;
     }
 
-    if (reads != null) {
-      final updates = <Point>[];
-      final ts = DateTime.timestamp().millisecondsSinceEpoch;
+    final updates = <Point>[];
 
-      if (poll.function == 1 || poll.function == 2) {
-        final view = reads.cast<bool>();
-
-        for (final point in poll.points) {
-          updates.add(
-            Point(
-              deviceId,
-              point.tag,
-              view[point.offset],
-            ),
-          );
+    if (poll.function == 1 || poll.function == 2) {
+      final view = reads.cast<bool>();
+      for (final point in poll.mapping) {
+        try {
+          final value = view[point.offset];
+          updates.add(Point(deviceId, point.to, value));
+        } on Exception catch (_) {
+          updates.add(Point(deviceId, point.to, null));
         }
-      } else {
-        final registers = reads.cast<int>();
-        final bytes = Uint8List(registers.length * 2);
-        final view = ByteData.view(bytes.buffer);
+      }
+    } else {
+      // register based
+      final registers = reads.cast<int>();
+      final bytes = Uint8List(registers.length * 2);
+      final view = ByteData.view(bytes.buffer);
+      for (var i = 0; i < registers.length; i++) {
+        view.setUint16(i * 2, registers[i]);
+      }
 
-        for (var i = 0; i < registers.length; i++) {
-          view.setUint16(i * 2, registers[i]);
-        }
-
-        for (final point in poll.points) {
+      for (final point in poll.mapping) {
+        try {
           final endian = point.endian.endian;
           final swap = point.endian.swap;
           final offset = point.offset * 2;
-
           final value = switch (point.type) {
-            PointType.bool => reads[point.offset] != 0,
+            PointType.bool => registers[point.offset] != 0,
             PointType.int => switch (point.length) {
               2 => view.getUint32Swap(offset, endian: endian, swap: swap),
               4 => view.getInt64(offset, endian),
@@ -121,26 +126,21 @@ final class ChannelSessionForModbus
               int() => view.getFloat32Swap(offset, endian: endian, swap: swap),
             },
           };
-
-          updates.add(
-            Point(
-              deviceId,
-              point.tag,
-              value,
-            ),
-          );
+          updates.add(Point(deviceId, point.to, value));
+        } on Exception catch (_) {
+          updates.add(Point(deviceId, point.to, null));
         }
       }
-
-      readController.add(ChannelUpdateEvent(deviceId, updates));
     }
+
+    readController.add(ChannelUpdateEvent(deviceId, updates));
   }
 
   @override
   void open() {
     for (final pool in templateOption.polls) {
       poolMap[pool] = Timer.periodic(
-        Duration(milliseconds: pool.intervalTime),
+        Duration(milliseconds: pool.intervalMs),
         (_) => _poll(pool),
       );
     }
