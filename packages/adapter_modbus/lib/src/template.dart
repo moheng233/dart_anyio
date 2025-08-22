@@ -86,7 +86,7 @@ final class ModbusPoint with ModbusPointMappable {
     required this.offset,
     this.scale = 1,
     this.length = 1,
-    this.endian = ModbusEndianType.dcba,
+    this.endian = ModbusEndianType.abcd,
     this.type = PointType.uint,
     this.access = ModbusAccessType.r,
   });

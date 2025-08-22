@@ -5,7 +5,6 @@ library;
 
 import 'dart:async';
 import 'dart:collection';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'modbus_server.dart';

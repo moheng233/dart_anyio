@@ -13,43 +13,64 @@
     "required": [
         "devices"
     ],
+    "additionalProperties": false,
     "definitions": {
-        "ChannelOptionForModbus": {
+        "DeviceOption": {
             "type": "object",
             "properties": {
-                "isRtu": {
-                    "type": "boolean"
+                "name": {
+                    "type": "string"
                 },
-                "unitId": {
-                    "type": "integer"
+                "template": {
+                    "type": "string"
                 },
-                "adapter": {
-                    "enumValues": [
-                        "modbus"
+                "channel": {
+                    "$ref": "#/definitions/ChannelOptionBase"
+                },
+                "transport_option": {
+                    "$ref": "#/definitions/TransportOptionBase"
+                },
+                "display_name": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
                     ]
+                },
+                "meta": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": {}
                 }
             },
             "required": [
-                "isRtu",
-                "unitId",
-                "adapter"
-            ]
-        },
-        "ChannelOptionBase": {
-            "type": "object",
-            "properties": {
-                "adapter": {
-                    "enumValues": [
-                        "modbus"
-                    ]
-                }
-            },
-            "required": [
-                "adapter"
+                "name",
+                "template",
+                "channel",
+                "transport_option"
             ],
+            "additionalProperties": false
+        },
+        "TransportOptionBase": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "tcp"
+                    ]
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "additionalProperties": true,
             "oneOf": [
                 {
-                    "$ref": "#/definitions/ChannelOptionForModbus"
+                    "$ref": "#/definitions/TransportOptionForTcp"
                 }
             ]
         },
@@ -62,68 +83,58 @@
                 "port": {
                     "type": "integer"
                 },
-                "adapter": {
-                    "enumValues": [
-                        "tcp"
-                    ]
+                "type": {
+                    "type": "string",
+                    "const": "tcp"
                 }
             },
             "required": [
                 "host",
                 "port",
-                "adapter"
-            ]
+                "type"
+            ],
+            "additionalProperties": false
         },
-        "TransportOptionBase": {
+        "ChannelOptionBase": {
             "type": "object",
             "properties": {
-                "adapter": {
-                    "enumValues": [
-                        "tcp"
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "modbus"
                     ]
                 }
             },
             "required": [
-                "adapter"
+                "type"
             ],
+            "additionalProperties": true,
             "oneOf": [
                 {
-                    "$ref": "#/definitions/TransportOptionForTcp"
+                    "$ref": "#/definitions/ChannelOptionForModbus"
                 }
             ]
         },
-        "DeviceOption": {
+        "ChannelOptionForModbus": {
             "type": "object",
             "properties": {
-                "name": {
-                    "type": "string"
+                "is_rtu": {
+                    "type": "boolean"
                 },
-                "template": {
-                    "type": "string"
+                "unit_id": {
+                    "type": "integer"
                 },
-                "channelOption": {
-                    "$ref": "#/definitions/ChannelOptionBase"
-                },
-                "transportOption": {
-                    "$ref": "#/definitions/TransportOptionBase"
-                },
-                "displayName": {
-                    "oneOf": [
-                        {
-                            "type": "string"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ]
+                "type": {
+                    "type": "string",
+                    "const": "modbus"
                 }
             },
             "required": [
-                "name",
-                "template",
-                "channelOption",
-                "transportOption"
-            ]
+                "is_rtu",
+                "unit_id",
+                "type"
+            ],
+            "additionalProperties": false
         }
     }
 }

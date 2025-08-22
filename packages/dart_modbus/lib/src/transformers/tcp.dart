@@ -114,13 +114,13 @@ class ModbusTcpRequestSerializer
 
   /// 获取请求的功能码
   int _getRequestFunctionCode(ModbusPDURequest request) {
-  return ModbusPduProcessor.getRequestFunctionCode(request);
+    return ModbusPduProcessor.getRequestFunctionCode(request);
   }
 
   /// 计算TCP请求数据长度
   int _calculateTcpRequestDataLength(ModbusPDURequest request) {
-  // 2 bytes: unitId + functionCode + body length
-  return 2 + ModbusPduProcessor.calculateRequestBodyLength(request);
+    // 2 bytes: unitId + functionCode + body length
+    return 2 + ModbusPduProcessor.calculateRequestBodyLength(request);
   }
 
   /// 填充请求数据
@@ -129,12 +129,7 @@ class ModbusTcpRequestSerializer
     ModbusPDURequest request,
     int offset,
   ) {
-  ModbusPduProcessor.fillRequestData(view, request, offset);
-  }
-
-  /// 将线圈布尔值打包成字节
-  void _packCoilsToBytes(ByteData view, List<bool> coils, int offset) {
-  // 已通过 ModbusPduProcessor.fillRequestData 实现
+    ModbusPduProcessor.fillRequestData(view, request, offset);
   }
 }
 
@@ -192,9 +187,8 @@ class ModbusTcpResponseParser
 
   /// 解析响应数据
   ModbusPDUResponse _parseResponseData(int functionCode, Uint8List data) {
-  return ModbusPduProcessor.parseResponse(functionCode, data);
+    return ModbusPduProcessor.parseResponse(functionCode, data);
   }
-
 }
 
 /// Modbus TCP响应序列化器

@@ -2,11 +2,11 @@
 devices:
   - name: "test"
     template: "test"
-    channelOption:
-      adapter: "modbus"
-      isRtu: true
-      unitId: 1
-    transportOption:
-      adapter: "tcp"
+    channel:
+      type: "modbus"
+      is_rtu: false
+      unit_id: 1
+    transport_option:
+      type: "tcp"
       host: "127.0.0.1"
       port: 8888
