@@ -12,5 +12,5 @@ void main(List<String> args) {
   final transports = TransportManagerImpl()
     ..register(TransportFactoryForTcpImpl());
 
-  print(TemplateOptionMapper.ensureInitialized().toJsonSchema().toJson());
+  print(ServiceOptionMapper.ensureInitialized().toJsonSchema().toJson());
 }

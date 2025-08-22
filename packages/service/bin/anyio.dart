@@ -1,16 +1,17 @@
+// ignore_for_file: avoid_print bin
+
 import 'dart:async';
 import 'dart:io';
 
-import 'package:checked_yaml/checked_yaml.dart';
-import 'package:path/path.dart' as path;
-import 'package:anyio_service/service.dart';
 import 'package:anyio_adapter_modbus/src/protocol.dart';
-import 'package:anyio_adapter_modbus/src/template.dart';
+import 'package:anyio_service/service.dart';
 import 'package:anyio_template/service.dart';
 
 Future<void> main(List<String> args) async {
   if (args.length < 2) {
-    print('Usage: anyio <device_config.yaml> <templates_directory> [http_port]');
+    print(
+      'Usage: anyio <device_config.yaml> <templates_directory> [http_port]',
+    );
     exit(1);
   }
 
@@ -18,12 +19,12 @@ Future<void> main(List<String> args) async {
   final templateDirectory = Directory(args[1]);
   final httpPort = args.length > 2 ? int.tryParse(args[2]) ?? 8080 : 8080;
 
-  if (!await deviceFile.exists()) {
+  if (!deviceFile.existsSync()) {
     print('Device configuration file not found: ${deviceFile.path}');
     exit(1);
   }
 
-  if (!await templateDirectory.exists()) {
+  if (!templateDirectory.existsSync()) {
     print('Template directory not found: ${templateDirectory.path}');
     exit(1);
   }
@@ -35,7 +36,7 @@ Future<void> main(List<String> args) async {
 
   // Initialize managers with isolated channels enabled
   final transportManager = TransportManagerImpl();
-  final channelManager = ChannelManagerImpl(useIsolatedChannels: true);
+  final channelManager = ChannelManagerImpl(useIsolatedChannels: false);
 
   // Register transport factories
   transportManager.register(TransportFactoryForTcpImpl());
@@ -47,9 +48,6 @@ Future<void> main(List<String> args) async {
   final serviceManager = ServiceManager(
     channelManager: channelManager,
     transportManager: transportManager,
-    enableChannelRestart: true,
-    maxRestartAttempts: 3,
-    restartDelaySeconds: 5,
   );
 
   // Initialize time-series database
@@ -67,10 +65,10 @@ Future<void> main(List<String> args) async {
     // Load configuration and templates
     print('Loading service configuration...');
     final serviceConfig = await serviceManager.loadServiceConfig(deviceFile);
-    
+
     print('Loading device templates...');
     final templates = await serviceManager.loadTemplates(templateDirectory);
-    
+
     print('Found ${templates.length} templates: ${templates.keys.join(', ')}');
     print('Found ${serviceConfig.devices.length} devices');
 
@@ -85,16 +83,21 @@ Future<void> main(List<String> args) async {
     // Setup data collection from devices
     for (final device in serviceManager.devices) {
       // Listen to channel events for this device
-      final session = serviceManager.getChannelSession(device.deviceId);
-      if (session != null) {
-        session.read.listen((event) {
-          if (event is ChannelUpdateEvent && event.deviceId == device.deviceId) {
-            for (final point in event.updates) {
-              dataCollector.collectPoint(point.deviceId, point.tagId, point.value);
-            }
-          }
-        });
-      }
+      // final session = serviceManager.getChannelSession(device.deviceId);
+      // if (session != null) {
+      //   session.read.listen((event) {
+      //     if (event is ChannelUpdateEvent &&
+      //         event.deviceId == device.deviceId) {
+      //       for (final point in event.updates) {
+      //         dataCollector.collectPoint(
+      //           point.deviceId,
+      //           point.tagId,
+      //           point.value,
+      //         );
+      //       }
+      //     }
+      //   });
+      // }
     }
 
     // Start HTTP API server
@@ -108,9 +111,14 @@ Future<void> main(List<String> args) async {
     print('  GET  http://localhost:$httpPort/devices/{deviceId}');
     print('  GET  http://localhost:$httpPort/devices/{deviceId}/values');
     print('  GET  http://localhost:$httpPort/devices/{deviceId}/points');
-    print('  GET  http://localhost:$httpPort/devices/{deviceId}/points/{pointId}');
-    print('  POST http://localhost:$httpPort/devices/{deviceId}/write');
-    print('  GET  http://localhost:$httpPort/history/{deviceId}[/{pointId}]?start=...&end=...&limit=...');
+    print(
+      '  GET  http://localhost:$httpPort/devices/{deviceId}/points/{pointId}',
+    );
+  print('  POST http://localhost:$httpPort/devices/{deviceId}/points/{pointId}');
+  print('       Body: JSON scalar or JSON value (e.g., true, 123, "text")');
+    print(
+      '  GET  http://localhost:$httpPort/history/{deviceId}[/{pointId}]?start=...&end=...&limit=...',
+    );
     print('  GET  http://localhost:$httpPort/stats');
     print('');
     print('Channel isolation: ENABLED (channels run in separate isolates)');
@@ -118,40 +126,39 @@ Future<void> main(List<String> args) async {
     print('Channel restart stats: ${serviceManager.getRestartStats()}');
 
     // Handle shutdown gracefully
-    ProcessSignal.sigint.watch().listen((_) async {
-      print('\nShutting down...');
-      await httpServer.stop();
-      await dataCollector.stop();
-      await serviceManager.stop();
-      print('Service stopped.');
-      exit(0);
-    });
+    // ProcessSignal.sigint.watch().listen((_) async {
+    //   print('\nShutting down...');
+    //   await httpServer.stop();
+    //   await dataCollector.stop();
+    //   await serviceManager.stop();
+    //   print('Service stopped.');
+    //   exit(0);
+    // });
 
-    ProcessSignal.sigterm.watch().listen((_) async {
-      print('\nShutting down...');
-      await httpServer.stop();
-      await dataCollector.stop();
-      await serviceManager.stop();
-      print('Service stopped.');
-      exit(0);
-    });
+    // ProcessSignal.sigterm.watch().listen((_) async {
+    //   print('\nShutting down...');
+    //   await httpServer.stop();
+    //   await dataCollector.stop();
+    //   await serviceManager.stop();
+    //   print('Service stopped.');
+    //   exit(0);
+    // });
 
     // Keep the service running
     await Completer<void>().future;
-
-  } catch (e, stackTrace) {
+  } on Exception catch (e, stackTrace) {
     print('Failed to start service: $e');
     print('Stack trace: $stackTrace');
-    
+
     // Cleanup on error
     try {
       await httpServer.stop();
       await dataCollector.stop();
       await serviceManager.stop();
-    } catch (cleanupError) {
+    } on Exception catch (cleanupError) {
       print('Error during cleanup: $cleanupError');
     }
-    
+
     exit(1);
   }
 }

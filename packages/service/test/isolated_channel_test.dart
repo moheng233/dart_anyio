@@ -3,27 +3,28 @@ import 'dart:isolate';
 
 import 'package:anyio_service/service.dart';
 import 'package:anyio_template/service.dart';
+import 'package:dart_mappable/dart_mappable.dart';
 
 /// Basic test for isolated channel functionality
 void main() async {
   print('Testing Isolated Channel Implementation...');
-  
+
   // Test basic isolated channel session creation
   await testIsolatedChannelCreation();
-  
+
   // Test error handling and restart
   await testChannelRestartLogic();
-  
+
   print('All tests completed successfully!');
 }
 
 Future<void> testIsolatedChannelCreation() async {
   print('\n=== Testing Isolated Channel Creation ===');
-  
+
   try {
     // Create a mock channel factory (this would be a real factory in practice)
     final mockFactory = MockChannelFactory();
-    
+
     // Create isolated channel session
     final deviceEventController = StreamController<DeviceBaseEvent>();
     final isolatedSession = IsolatedChannelSession(
@@ -34,22 +35,21 @@ Future<void> testIsolatedChannelCreation() async {
       transport: MockTransportSession(),
       deviceEvent: deviceEventController.stream,
     );
-    
+
     print('✓ Isolated channel session created successfully');
-    
+
     // Test opening and closing
     isolatedSession.open();
     print('✓ Channel opened');
-    
+
     await Future.delayed(Duration(milliseconds: 100));
-    
+
     isolatedSession.stop();
     print('✓ Channel stopped');
-    
+
     await isolatedSession.dispose();
     await deviceEventController.close();
     print('✓ Resources disposed');
-    
   } catch (e) {
     print('✗ Test failed: $e');
   }
@@ -57,12 +57,12 @@ Future<void> testIsolatedChannelCreation() async {
 
 Future<void> testChannelRestartLogic() async {
   print('\n=== Testing Channel Restart Logic ===');
-  
+
   try {
     // Create service manager with restart enabled
     final channelManager = ChannelManagerImpl(useIsolatedChannels: true);
     channelManager.registerFactory(MockChannelFactory());
-    
+
     final serviceManager = ServiceManager(
       channelManager: channelManager,
       transportManager: MockTransportManager(),
@@ -70,15 +70,14 @@ Future<void> testChannelRestartLogic() async {
       maxRestartAttempts: 3,
       restartDelaySeconds: 1,
     );
-    
+
     print('✓ Service manager created with restart enabled');
-    
+
     // Test restart statistics
     final stats = serviceManager.getRestartStats();
     print('✓ Restart stats initialized: ${stats.isEmpty}');
-    
+
     print('✓ Channel restart logic tested');
-    
   } catch (e) {
     print('✗ Test failed: $e');
   }
@@ -86,9 +85,10 @@ Future<void> testChannelRestartLogic() async {
 
 // Mock implementations for testing
 
-class MockChannelFactory implements ChannelFactory {
+final class MockChannelFactory extends ChannelFactory {
   @override
-  ChannelSession create(String deviceId, {
+  ChannelSession create(
+    String deviceId, {
     required Stream<DeviceBaseEvent> deviceEvent,
     required TransportSession transport,
     required ChannelOptionBase channelOption,
@@ -98,14 +98,16 @@ class MockChannelFactory implements ChannelFactory {
   }
 
   @override
-  ClassMapperBase get channelOptionMapper => throw UnimplementedError();
+  ClassMapperBase<ChannelOptionBase> get channelOptionMapper =>
+      throw UnimplementedError();
 
   @override
-  ClassMapperBase get templateOptionMapper => throw UnimplementedError();
+  ClassMapperBase<ChannelTemplateBase> get templateOptionMapper =>
+      throw UnimplementedError();
 }
 
-class MockChannelSession extends ChannelSessionBase<ChannelOptionBase, ChannelTemplateBase> {
-  MockChannelSession() : super(write: Stream.empty());
+final class MockChannelSession extends ChannelSession {
+  MockChannelSession() : super(write: const Stream.empty());
 
   final _readController = StreamController<ChannelBaseEvent>.broadcast();
 
@@ -121,9 +123,9 @@ class MockChannelSession extends ChannelSessionBase<ChannelOptionBase, ChannelTe
   }
 }
 
-class MockChannelOption extends ChannelOptionBase {}
+final class MockChannelOption extends ChannelOptionBase {}
 
-class MockTemplateOption extends ChannelTemplateBase {}
+final class MockTemplateOption extends ChannelTemplateBase {}
 
 class MockTransportSession implements TransportSession {
   @override

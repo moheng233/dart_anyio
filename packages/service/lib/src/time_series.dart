@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:collection';
 
-import 'package:anyio_template/service.dart';
+import 'package:dart_mappable/dart_mappable.dart';
+
+part 'time_series.mapper.dart';
 
 /// Data point for time-series storage
 class DataPoint {
@@ -108,9 +110,9 @@ class InMemoryTimeSeriesDatabase implements TimeSeriesDatabase {
   @override
   Future<void> writePoint(DataPoint point) async {
     final key = _getKey(point.deviceId, point.pointId);
-    
+
     _data.putIfAbsent(key, () => <DataPoint>[]).add(point);
-    
+
     // Keep only the latest N points per series
     final series = _data[key]!;
     if (series.length > _maxPointsPerSeries) {
@@ -140,7 +142,9 @@ class InMemoryTimeSeriesDatabase implements TimeSeriesDatabase {
       // Query all points for device
       for (final entry in _data.entries) {
         if (entry.key.startsWith('${query.deviceId}:')) {
-          results.addAll(_filterByTime(entry.value, query.startTime, query.endTime));
+          results.addAll(
+            _filterByTime(entry.value, query.startTime, query.endTime),
+          );
         }
       }
     }
@@ -160,13 +164,13 @@ class InMemoryTimeSeriesDatabase implements TimeSeriesDatabase {
   Future<DataPoint?> getLatest(String deviceId, String pointId) async {
     final key = _getKey(deviceId, pointId);
     final series = _data[key];
-    return series?.isNotEmpty == true ? series.last : null;
+    return series?.isNotEmpty ?? false ? series?.last : null;
   }
 
   @override
   Future<List<DataPoint>> getLatestForDevice(String deviceId) async {
     final results = <DataPoint>[];
-    
+
     for (final entry in _data.entries) {
       if (entry.key.startsWith('$deviceId:') && entry.value.isNotEmpty) {
         results.add(entry.value.last);
@@ -176,44 +180,59 @@ class InMemoryTimeSeriesDatabase implements TimeSeriesDatabase {
     return results;
   }
 
-  List<DataPoint> _filterByTime(List<DataPoint> points, DateTime? startTime, DateTime? endTime) {
+  List<DataPoint> _filterByTime(
+    List<DataPoint> points,
+    DateTime? startTime,
+    DateTime? endTime,
+  ) {
     var filtered = points.asMap().entries.map((e) => e.value);
-    
+
     if (startTime != null) {
-      filtered = filtered.where((p) => p.timestamp.isAfter(startTime) || p.timestamp.isAtSameMomentAs(startTime));
+      filtered = filtered.where(
+        (p) =>
+            p.timestamp.isAfter(startTime) ||
+            p.timestamp.isAtSameMomentAs(startTime),
+      );
     }
-    
+
     if (endTime != null) {
-      filtered = filtered.where((p) => p.timestamp.isBefore(endTime) || p.timestamp.isAtSameMomentAs(endTime));
+      filtered = filtered.where(
+        (p) =>
+            p.timestamp.isBefore(endTime) ||
+            p.timestamp.isAtSameMomentAs(endTime),
+      );
     }
-    
+
     return filtered.toList();
   }
 
   /// Get statistics about stored data
-  Map<String, dynamic> getStatistics() {
-    final stats = <String, dynamic>{
-      'totalSeries': _data.length,
-      'totalPoints': _data.values.map((s) => s.length).fold(0, (a, b) => a + b),
-      'series': <String, dynamic>{},
-    };
+  TimeSeriesStatistics getStatistics() {
+    final totalSeries = _data.length;
+    final totalPoints = _data.values
+        .map((s) => s.length)
+        .fold<int>(0, (a, b) => a + b);
+
+    final Map<String, DeviceSeriesStats> series = {};
 
     for (final entry in _data.entries) {
       final parts = entry.key.split(':');
       final deviceId = parts[0];
       final pointId = parts[1];
-      
-      if (!stats['series'].containsKey(deviceId)) {
-        stats['series'][deviceId] = <String, dynamic>{};
-      }
-      
-      stats['series'][deviceId][pointId] = {
-        'pointCount': entry.value.length,
-        'latest': entry.value.isNotEmpty ? entry.value.last.toJson() : null,
-      };
+
+      series.putIfAbsent(deviceId, () => DeviceSeriesStats(points: {}));
+
+      series[deviceId]!.points[pointId] = PointSeriesStats(
+        pointCount: entry.value.length,
+        latest: entry.value.isNotEmpty ? entry.value.last : null,
+      );
     }
 
-    return stats;
+    return TimeSeriesStatistics(
+      totalSeries: totalSeries,
+      totalPoints: totalPoints,
+      series: series,
+    );
   }
 }
 
@@ -236,7 +255,7 @@ class DataCollector {
   /// Start the data collector
   Future<void> start() async {
     if (_isStarted) return;
-    
+
     await timeSeriesDb.initialize();
     _startFlushTimer();
     _isStarted = true;
@@ -245,7 +264,7 @@ class DataCollector {
   /// Stop the data collector
   Future<void> stop() async {
     if (!_isStarted) return;
-    
+
     _flushTimer?.cancel();
     await _flushPendingPoints();
     await timeSeriesDb.close();
@@ -253,7 +272,12 @@ class DataCollector {
   }
 
   /// Collect a data point
-  Future<void> collectPoint(String deviceId, String pointId, Object? value, {DataQuality quality = DataQuality.good}) async {
+  Future<void> collectPoint(
+    String deviceId,
+    String pointId,
+    Object? value, {
+    DataQuality quality = DataQuality.good,
+  }) async {
     final point = DataPoint(
       deviceId: deviceId,
       pointId: pointId,
@@ -289,4 +313,33 @@ class DataCollector {
       print('Failed to write points to time-series database: $e');
     }
   }
+}
+
+/// Statistics model for time-series data
+@MappableClass()
+class PointSeriesStats with PointSeriesStatsMappable {
+  PointSeriesStats({required this.pointCount, this.latest});
+
+  final int pointCount;
+  final DataPoint? latest;
+}
+
+@MappableClass()
+class DeviceSeriesStats with DeviceSeriesStatsMappable {
+  DeviceSeriesStats({required this.points});
+
+  final Map<String, PointSeriesStats> points;
+}
+
+@MappableClass()
+class TimeSeriesStatistics with TimeSeriesStatisticsMappable {
+  TimeSeriesStatistics({
+    required this.totalSeries,
+    required this.totalPoints,
+    required this.series,
+  });
+
+  final int totalSeries;
+  final int totalPoints;
+  final Map<String, DeviceSeriesStats> series;
 }

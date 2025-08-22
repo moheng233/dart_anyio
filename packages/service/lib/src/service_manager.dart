@@ -4,14 +4,11 @@ import 'dart:io';
 
 import 'package:anyio_template/service.dart';
 import 'package:checked_yaml/checked_yaml.dart';
-import 'package:meta/meta.dart';
 import 'package:path/path.dart' as path;
 
 import 'channel_manager.dart';
 import 'device.dart';
-import 'isolated_channel.dart';
 import 'logging/logging.dart';
-import 'transport_manager.dart';
 
 /// Service gateway manager that orchestrates the entire system
 final class ServiceManager {
@@ -30,20 +27,20 @@ final class ServiceManager {
       logger: logger,
       performanceMonitor: performanceMonitor,
     );
-    
+
     _logger = LoggingManager.instance.logger;
     _performanceMonitor = LoggingManager.instance.performanceMonitor;
   }
 
   final ChannelManager channelManager;
   final TransportManager transportManager;
-  
+
   /// Whether to automatically restart failed channels
   final bool enableChannelRestart;
-  
+
   /// Maximum number of restart attempts per channel
   final int maxRestartAttempts;
-  
+
   /// Delay between restart attempts (seconds)
   final int restartDelaySeconds;
 
@@ -55,10 +52,10 @@ final class ServiceManager {
 
   final _devices = HashMap<String, DeviceImpl>();
   final _channelSessions = HashMap<String, ChannelSession>();
-  final _deviceEventControllers = HashMap<String, StreamController<DeviceBaseEvent>>();
-  final _channelErrorSubscriptions = HashMap<String, StreamSubscription>();
+  final _deviceEventControllers =
+      HashMap<String, StreamController<DeviceBaseEvent>>();
   final _restartAttempts = HashMap<String, int>();
-  
+
   bool _isRunning = false;
 
   /// Load service configuration from file
@@ -66,31 +63,36 @@ final class ServiceManager {
     final content = await configFile.readAsString();
     return checkedYamlDecode(
       content,
-      (json) => ServiceOption.fromJson(json!),
+      (json) => ServiceOptionMapper.fromMap(json!.cast<String, dynamic>()),
     );
   }
 
   /// Load device templates from directory
-  Future<Map<String, TemplateOption>> loadTemplates(Directory templateDir) async {
+  Future<Map<String, TemplateOption>> loadTemplates(
+    Directory templateDir,
+  ) async {
     final templates = HashMap<String, TemplateOption>();
-    
+
     await for (final entity in templateDir.list()) {
       if (entity is File && path.extension(entity.path) == '.yaml') {
         final templateName = path.basenameWithoutExtension(entity.path);
         final content = await entity.readAsString();
         final template = checkedYamlDecode(
           content,
-          (json) => TemplateOption.fromJson(json!),
+          (json) => TemplateOptionMapper.fromMap(json!.cast<String, dynamic>()),
         );
         templates[templateName] = template;
       }
     }
-    
+
     return templates;
   }
 
   /// Start the service with given configuration
-  Future<void> start(ServiceOption config, Map<String, TemplateOption> templates) async {
+  Future<void> start(
+    ServiceOption config,
+    Map<String, TemplateOption> templates,
+  ) async {
     if (_isRunning) {
       throw StateError('Service is already running');
     }
@@ -110,12 +112,6 @@ final class ServiceManager {
     if (!_isRunning) return;
 
     _logger.info('Stopping service');
-
-    // Cancel all error subscriptions
-    for (final subscription in _channelErrorSubscriptions.values) {
-      await subscription.cancel();
-    }
-    _channelErrorSubscriptions.clear();
 
     // Stop all devices
     for (final device in _devices.values) {
@@ -143,9 +139,9 @@ final class ServiceManager {
     _devices.clear();
     _restartAttempts.clear();
     _isRunning = false;
-    
+
     _logger.info('Service stopped');
-    
+
     // Shutdown logging system
     await LoggingManager.instance.shutdown();
   }
@@ -160,7 +156,8 @@ final class ServiceManager {
   Iterable<String> get deviceIds => _devices.keys;
 
   /// Get channel session for device
-  ChannelSession? getChannelSession(String deviceId) => _channelSessions[deviceId];
+  ChannelSession? getChannelSession(String deviceId) =>
+      _channelSessions[deviceId];
 
   /// Manually restart a channel
   Future<bool> restartChannel(String deviceId) async {
@@ -173,20 +170,22 @@ final class ServiceManager {
         _logger.info('Manually restarting channel', deviceId: deviceId);
         await (channelManager as ChannelManagerImpl).restartChannel(deviceId);
         _restartAttempts[deviceId] = 0; // Reset attempts on successful restart
-        
+
         restartTimer.complete();
         _logger.info('Channel restart successful', deviceId: deviceId);
         return true;
-      } catch (e, stackTrace) {
+      } on Exception catch (e, stackTrace) {
         restartTimer.fail();
-        _logger.error('Failed to restart channel', 
-                     deviceId: deviceId, 
-                     error: e, 
-                     stackTrace: stackTrace);
+        _logger.error(
+          'Failed to restart channel',
+          deviceId: deviceId,
+          error: e,
+          stackTrace: stackTrace,
+        );
         return false;
       }
     }
-    
+
     restartTimer.fail();
     return false;
   }
@@ -206,14 +205,20 @@ final class ServiceManager {
 
   /// Set log level for a specific device
   void setDeviceLogLevel(String deviceId, LogLevel level) {
-    _logger.setDeviceLogLevel(deviceId, level);
-    _logger.info('Log level changed', deviceId: deviceId, context: {'level': level.name});
+    _logger
+      ..setDeviceLogLevel(deviceId, level)
+      ..info(
+        'Log level changed',
+        deviceId: deviceId,
+        context: {'level': level.name},
+      );
   }
 
   /// Set global log level
   void setGlobalLogLevel(LogLevel level) {
-    _logger.setGlobalLogLevel(level);
-    _logger.info('Global log level changed', context: {'level': level.name});
+    _logger
+      ..setGlobalLogLevel(level)
+      ..info('Global log level changed', context: {'level': level.name});
   }
 
   /// Clear performance metrics for a device
@@ -222,63 +227,84 @@ final class ServiceManager {
     _logger.debug('Performance metrics cleared', deviceId: deviceId);
   }
 
-  void _setupChannelErrorHandling(String deviceId, ChannelSession channelSession) {
+  void _setupChannelErrorHandling(
+    String deviceId,
+    ChannelSession channelSession,
+  ) {
     if (!enableChannelRestart) return;
 
     // Listen for channel errors for auto-restart
-    final subscription = channelSession.read.handleError((error, stackTrace) {
+    // ignore: cancel_subscriptions
+    channelSession.read.handleError((Object error, StackTrace? stackTrace) {
       _handleChannelError(deviceId, error, stackTrace);
-    }).listen(null);
-
-    _channelErrorSubscriptions[deviceId] = subscription;
+    });
   }
 
-  void _handleChannelError(String deviceId, dynamic error, StackTrace? stackTrace) async {
-    _logger.error('Channel error detected', 
-                 deviceId: deviceId, 
-                 error: error, 
-                 stackTrace: stackTrace);
+  Future<void> _handleChannelError(
+    String deviceId,
+    dynamic error,
+    StackTrace? stackTrace,
+  ) async {
+    _logger.error(
+      'Channel error detected',
+      deviceId: deviceId,
+      error: error,
+      stackTrace: stackTrace,
+    );
 
     final attempts = _restartAttempts[deviceId] ?? 0;
     if (attempts >= maxRestartAttempts) {
-      _logger.fatal('Max restart attempts reached', 
-                   deviceId: deviceId,
-                   context: {'attempts': attempts, 'max_attempts': maxRestartAttempts});
+      _logger.fatal(
+        'Max restart attempts reached',
+        deviceId: deviceId,
+        context: {'attempts': attempts, 'max_attempts': maxRestartAttempts},
+      );
       return;
     }
 
     _restartAttempts[deviceId] = attempts + 1;
 
-    _logger.warn('Attempting channel restart', 
-                deviceId: deviceId,
-                context: {'attempt': attempts + 1, 'max_attempts': maxRestartAttempts});
+    _logger.warn(
+      'Attempting channel restart',
+      deviceId: deviceId,
+      context: {'attempt': attempts + 1, 'max_attempts': maxRestartAttempts},
+    );
 
     // Wait before attempting restart
     await Future.delayed(Duration(seconds: restartDelaySeconds));
 
     final success = await restartChannel(deviceId);
     if (success) {
-      _logger.info('Auto-restart successful', 
-                  deviceId: deviceId,
-                  context: {'attempt': attempts + 1});
+      _logger.info(
+        'Auto-restart successful',
+        deviceId: deviceId,
+        context: {'attempt': attempts + 1},
+      );
     } else {
-      _logger.error('Auto-restart failed', 
-                   deviceId: deviceId,
-                   context: {'attempt': attempts + 1});
+      _logger.error(
+        'Auto-restart failed',
+        deviceId: deviceId,
+        context: {'attempt': attempts + 1},
+      );
     }
   }
 
-  Future<void> _startDevice(DeviceOption deviceConfig, Map<String, TemplateOption> templates) async {
+  Future<void> _startDevice(
+    DeviceOption deviceConfig,
+    Map<String, TemplateOption> templates,
+  ) async {
     final deviceId = deviceConfig.name;
     final startupTimer = _performanceMonitor.startStartupTimer(deviceId);
-    
+
     try {
-      _logger.info('Starting device', 
-                  deviceId: deviceId,
-                  context: {
-                    'template': deviceConfig.template,
-                    'transport': deviceConfig.transportOption.runtimeType.toString(),
-                  });
+      _logger.info(
+        'Starting device',
+        deviceId: deviceId,
+        context: {
+          'template': deviceConfig.template,
+          'transport': deviceConfig.transportOption.runtimeType.toString(),
+        },
+      );
 
       final template = templates[deviceConfig.template];
       if (template == null) {
@@ -286,19 +312,22 @@ final class ServiceManager {
       }
 
       // Log device configuration
-      _logger.debug('Device configuration loaded',
-                   deviceId: deviceId,
-                   context: {
-                     'template': deviceConfig.template,
-                     'channel_type': deviceConfig.channel.runtimeType.toString(),
-                   });
+      _logger.debug(
+        'Device configuration loaded',
+        deviceId: deviceId,
+        context: {
+          'template': deviceConfig.template,
+          'channel_type': deviceConfig.channel.runtimeType.toString(),
+        },
+      );
 
       // Create transport session
       final transport = transportManager.create(deviceConfig.transportOption);
       await transport.open();
 
       // Create device event controller
-      final deviceEventController = StreamController<DeviceBaseEvent>.broadcast();
+      final deviceEventController =
+          StreamController<DeviceBaseEvent>.broadcast();
       _deviceEventControllers[deviceId] = deviceEventController;
 
       // Create channel session
@@ -324,22 +353,23 @@ final class ServiceManager {
 
       // Start channel session
       channelSession.open();
-      
+
       // Setup error handling for channel restarts
       _setupChannelErrorHandling(deviceId, channelSession);
-      
+
       // Start listening to channel events
       device.startListening();
 
       startupTimer.complete();
       _logger.info('Device started successfully', deviceId: deviceId);
-      
     } catch (e, stackTrace) {
       startupTimer.fail();
-      _logger.error('Failed to start device', 
-                   deviceId: deviceId, 
-                   error: e, 
-                   stackTrace: stackTrace);
+      _logger.error(
+        'Failed to start device',
+        deviceId: deviceId,
+        error: e,
+        stackTrace: stackTrace,
+      );
       rethrow;
     }
   }

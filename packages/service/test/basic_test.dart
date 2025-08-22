@@ -1,5 +1,7 @@
+// ignore_for_file: avoid_print test
+
 import 'package:anyio_service/service.dart';
-import 'package:anyio_template/service.dart';
+// ...existing imports...
 
 void main() async {
   print('Testing AnyIO Service Components...');
@@ -18,24 +20,27 @@ void main() async {
   );
 
   await timeSeriesDb.writePoint(testPoint);
-  
+
   final latest = await timeSeriesDb.getLatest('test_device', 'temperature');
   print('Latest value: ${latest?.value}');
-  
+
   final stats = timeSeriesDb.getStatistics();
-  print('DB Statistics: ${stats['totalPoints']} points in ${stats['totalSeries']} series');
+  final statsJson = stats.toMap();
+  print(
+    'DB Statistics: ${statsJson['totalPoints']} points in ${statsJson['totalSeries']} series',
+  );
 
   // Test data collector
   print('\n2. Testing Data Collector...');
   final dataCollector = DataCollector(timeSeriesDb: timeSeriesDb);
   await dataCollector.start();
-  
+
   await dataCollector.collectPoint('test_device', 'pressure', 1013.25);
   await dataCollector.collectPoint('test_device', 'humidity', 65.0);
-  
+
   // Wait a bit for batch processing
-  await Future.delayed(Duration(milliseconds: 100));
-  
+  await Future<void>.delayed(const Duration(milliseconds: 100));
+
   final devicePoints = await timeSeriesDb.getLatestForDevice('test_device');
   print('Device points collected: ${devicePoints.length}');
   for (final point in devicePoints) {
@@ -49,7 +54,7 @@ void main() async {
   print('\n3. Testing Manager Components...');
   final transportManager = TransportManagerImpl();
   final channelManager = ChannelManagerImpl();
-  
+
   print('Transport manager created: ${transportManager.runtimeType}');
   print('Channel manager created: ${channelManager.runtimeType}');
 
@@ -58,7 +63,7 @@ void main() async {
     channelManager: channelManager,
     transportManager: transportManager,
   );
-  
+
   print('Service manager created: ${serviceManager.runtimeType}');
   print('Device count: ${serviceManager.devices.length}');
 

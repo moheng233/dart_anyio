@@ -1,21 +1,6 @@
 import 'dart:io';
 
-/// Log levels for filtering log messages
-enum LogLevel {
-  trace(0, 'TRACE'),
-  debug(1, 'DEBUG'),
-  info(2, 'INFO '),
-  warn(3, 'WARN '),
-  error(4, 'ERROR'),
-  fatal(5, 'FATAL');
-
-  const LogLevel(this.level, this.name);
-
-  final int level;
-  final String name;
-
-  bool isEnabledFor(LogLevel other) => level <= other.level;
-}
+import 'package:anyio_template/service.dart';
 
 /// Structured log entry
 class LogEntry {
@@ -39,54 +24,36 @@ class LogEntry {
 
   @override
   String toString() {
-    final buffer = StringBuffer();
-    buffer.write('${timestamp.toIso8601String()} ');
-    buffer.write('[${level.name}] ');
-    
+    final buffer = StringBuffer()
+      ..write('${timestamp.toIso8601String()} ')
+      ..write('[${level.name}] ');
+
     if (deviceId != null) {
       buffer.write('[$deviceId] ');
     }
-    
+
     buffer.write(message);
-    
+
     if (context != null && context!.isNotEmpty) {
       buffer.write(' | Context: $context');
     }
-    
+
     if (error != null) {
       buffer.write(' | Error: $error');
     }
-    
+
     if (stackTrace != null) {
       buffer.write('\n$stackTrace');
     }
-    
+
     return buffer.toString();
   }
 }
 
-/// Logger interface for channel and device logging
-abstract class Logger {
-  void trace(String message, {String? deviceId, Map<String, dynamic>? context});
-  void debug(String message, {String? deviceId, Map<String, dynamic>? context});
-  void info(String message, {String? deviceId, Map<String, dynamic>? context});
-  void warn(String message, {String? deviceId, Map<String, dynamic>? context, Object? error});
-  void error(String message, {String? deviceId, Map<String, dynamic>? context, Object? error, StackTrace? stackTrace});
-  void fatal(String message, {String? deviceId, Map<String, dynamic>? context, Object? error, StackTrace? stackTrace});
-  
-  /// Set log level for a specific device
-  void setDeviceLogLevel(String deviceId, LogLevel level);
-  
-  /// Set global default log level
-  void setGlobalLogLevel(LogLevel level);
-  
-  /// Get effective log level for a device
-  LogLevel getEffectiveLogLevel(String? deviceId);
-}
-
 /// Console logger implementation with device-specific log levels
 class ConsoleLogger implements Logger {
-  ConsoleLogger({LogLevel globalLevel = LogLevel.info}) : _globalLevel = globalLevel;
+  ConsoleLogger({LogLevel globalLevel = LogLevel.info})
+    : _globalLevel = globalLevel;
 
   LogLevel _globalLevel;
   final Map<String, LogLevel> _deviceLogLevels = <String, LogLevel>{};
@@ -110,12 +77,20 @@ class ConsoleLogger implements Logger {
   }
 
   @override
-  void trace(String message, {String? deviceId, Map<String, dynamic>? context}) {
+  void trace(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+  }) {
     _log(LogLevel.trace, message, deviceId: deviceId, context: context);
   }
 
   @override
-  void debug(String message, {String? deviceId, Map<String, dynamic>? context}) {
+  void debug(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+  }) {
     _log(LogLevel.debug, message, deviceId: deviceId, context: context);
   }
 
@@ -125,21 +100,60 @@ class ConsoleLogger implements Logger {
   }
 
   @override
-  void warn(String message, {String? deviceId, Map<String, dynamic>? context, Object? error}) {
-    _log(LogLevel.warn, message, deviceId: deviceId, context: context, error: error);
+  void warn(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+    Object? error,
+  }) {
+    _log(
+      LogLevel.warn,
+      message,
+      deviceId: deviceId,
+      context: context,
+      error: error,
+    );
   }
 
   @override
-  void error(String message, {String? deviceId, Map<String, dynamic>? context, Object? error, StackTrace? stackTrace}) {
-    _log(LogLevel.error, message, deviceId: deviceId, context: context, error: error, stackTrace: stackTrace);
+  void error(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    _log(
+      LogLevel.error,
+      message,
+      deviceId: deviceId,
+      context: context,
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 
   @override
-  void fatal(String message, {String? deviceId, Map<String, dynamic>? context, Object? error, StackTrace? stackTrace}) {
-    _log(LogLevel.fatal, message, deviceId: deviceId, context: context, error: error, stackTrace: stackTrace);
+  void fatal(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    _log(
+      LogLevel.fatal,
+      message,
+      deviceId: deviceId,
+      context: context,
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 
-  void _log(LogLevel level, String message, {
+  void _log(
+    LogLevel level,
+    String message, {
     String? deviceId,
     Map<String, dynamic>? context,
     Object? error,
@@ -181,7 +195,7 @@ class FileLogger implements Logger {
   final String logFilePath;
   final int maxFileSizeBytes;
   final int maxBackupFiles;
-  
+
   LogLevel _globalLevel;
   final Map<String, LogLevel> _deviceLogLevels = <String, LogLevel>{};
   IOSink? _logSink;
@@ -191,10 +205,10 @@ class FileLogger implements Logger {
 
     final logFile = File(logFilePath);
     await logFile.parent.create(recursive: true);
-    
+
     // Check if rotation is needed
-    if (await logFile.exists()) {
-      final stat = await logFile.stat();
+    if (logFile.existsSync()) {
+      final stat = logFile.statSync();
       if (stat.size > maxFileSizeBytes) {
         await _rotateLogFile();
       }
@@ -205,18 +219,18 @@ class FileLogger implements Logger {
 
   Future<void> _rotateLogFile() async {
     final logFile = File(logFilePath);
-    
+
     // Rotate existing backup files
-    for (int i = maxBackupFiles - 1; i >= 1; i--) {
+    for (var i = maxBackupFiles - 1; i >= 1; i--) {
       final oldFile = File('$logFilePath.$i');
-      if (await oldFile.exists()) {
+      if (oldFile.existsSync()) {
         final newFile = File('$logFilePath.${i + 1}');
         await oldFile.rename(newFile.path);
       }
     }
-    
+
     // Move current log to backup
-    if (await logFile.exists()) {
+    if (logFile.existsSync()) {
       final backupFile = File('$logFilePath.1');
       await logFile.rename(backupFile.path);
     }
@@ -241,12 +255,20 @@ class FileLogger implements Logger {
   }
 
   @override
-  void trace(String message, {String? deviceId, Map<String, dynamic>? context}) {
+  void trace(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+  }) {
     _log(LogLevel.trace, message, deviceId: deviceId, context: context);
   }
 
   @override
-  void debug(String message, {String? deviceId, Map<String, dynamic>? context}) {
+  void debug(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+  }) {
     _log(LogLevel.debug, message, deviceId: deviceId, context: context);
   }
 
@@ -256,21 +278,60 @@ class FileLogger implements Logger {
   }
 
   @override
-  void warn(String message, {String? deviceId, Map<String, dynamic>? context, Object? error}) {
-    _log(LogLevel.warn, message, deviceId: deviceId, context: context, error: error);
+  void warn(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+    Object? error,
+  }) {
+    _log(
+      LogLevel.warn,
+      message,
+      deviceId: deviceId,
+      context: context,
+      error: error,
+    );
   }
 
   @override
-  void error(String message, {String? deviceId, Map<String, dynamic>? context, Object? error, StackTrace? stackTrace}) {
-    _log(LogLevel.error, message, deviceId: deviceId, context: context, error: error, stackTrace: stackTrace);
+  void error(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    _log(
+      LogLevel.error,
+      message,
+      deviceId: deviceId,
+      context: context,
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 
   @override
-  void fatal(String message, {String? deviceId, Map<String, dynamic>? context, Object? error, StackTrace? stackTrace}) {
-    _log(LogLevel.fatal, message, deviceId: deviceId, context: context, error: error, stackTrace: stackTrace);
+  void fatal(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    _log(
+      LogLevel.fatal,
+      message,
+      deviceId: deviceId,
+      context: context,
+      error: error,
+      stackTrace: stackTrace,
+    );
   }
 
-  void _log(LogLevel level, String message, {
+  Future<void> _log(
+    LogLevel level,
+    String message, {
     String? deviceId,
     Map<String, dynamic>? context,
     Object? error,
@@ -326,18 +387,28 @@ class MultiLogger implements Logger {
   @override
   LogLevel getEffectiveLogLevel(String? deviceId) {
     // Use the first logger's level as the effective level
-    return loggers.isNotEmpty ? loggers.first.getEffectiveLogLevel(deviceId) : LogLevel.info;
+    return loggers.isNotEmpty
+        ? loggers.first.getEffectiveLogLevel(deviceId)
+        : LogLevel.info;
   }
 
   @override
-  void trace(String message, {String? deviceId, Map<String, dynamic>? context}) {
+  void trace(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+  }) {
     for (final logger in loggers) {
       logger.trace(message, deviceId: deviceId, context: context);
     }
   }
 
   @override
-  void debug(String message, {String? deviceId, Map<String, dynamic>? context}) {
+  void debug(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+  }) {
     for (final logger in loggers) {
       logger.debug(message, deviceId: deviceId, context: context);
     }
@@ -351,23 +422,52 @@ class MultiLogger implements Logger {
   }
 
   @override
-  void warn(String message, {String? deviceId, Map<String, dynamic>? context, Object? error}) {
+  void warn(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+    Object? error,
+  }) {
     for (final logger in loggers) {
       logger.warn(message, deviceId: deviceId, context: context, error: error);
     }
   }
 
   @override
-  void error(String message, {String? deviceId, Map<String, dynamic>? context, Object? error, StackTrace? stackTrace}) {
+  void error(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     for (final logger in loggers) {
-      logger.error(message, deviceId: deviceId, context: context, error: error, stackTrace: stackTrace);
+      logger.error(
+        message,
+        deviceId: deviceId,
+        context: context,
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 
   @override
-  void fatal(String message, {String? deviceId, Map<String, dynamic>? context, Object? error, StackTrace? stackTrace}) {
+  void fatal(
+    String message, {
+    String? deviceId,
+    Map<String, dynamic>? context,
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
     for (final logger in loggers) {
-      logger.fatal(message, deviceId: deviceId, context: context, error: error, stackTrace: stackTrace);
+      logger.fatal(
+        message,
+        deviceId: deviceId,
+        context: context,
+        error: error,
+        stackTrace: stackTrace,
+      );
     }
   }
 }

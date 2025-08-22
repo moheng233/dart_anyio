@@ -1,12 +1,13 @@
+import 'package:anyio_template/service.dart';
+
 import 'logger.dart';
 import 'performance_monitor.dart';
 
 /// Central logging and monitoring manager for the service
 class LoggingManager {
   LoggingManager._();
-  
-  static LoggingManager? _instance;
-  static LoggingManager get instance => _instance ??= LoggingManager._();
+
+  static final LoggingManager instance = LoggingManager._();
 
   Logger? _logger;
   PerformanceMonitor? _performanceMonitor;
@@ -23,7 +24,9 @@ class LoggingManager {
   /// Get the current logger
   Logger get logger {
     if (_logger == null) {
-      throw StateError('LoggingManager not initialized. Call initialize() first.');
+      throw StateError(
+        'LoggingManager not initialized. Call initialize() first.',
+      );
     }
     return _logger!;
   }
@@ -31,7 +34,9 @@ class LoggingManager {
   /// Get the performance monitor
   PerformanceMonitor get performanceMonitor {
     if (_performanceMonitor == null) {
-      throw StateError('LoggingManager not initialized. Call initialize() first.');
+      throw StateError(
+        'LoggingManager not initialized. Call initialize() first.',
+      );
     }
     return _performanceMonitor!;
   }
@@ -76,7 +81,11 @@ class LoggingManager {
   }
 
   /// Log channel startup failure
-  void logChannelStartupFailure(String deviceId, Object error, {StackTrace? stackTrace}) {
+  void logChannelStartupFailure(
+    String deviceId,
+    Object error, {
+    StackTrace? stackTrace,
+  }) {
     logger.error(
       'Channel startup failed',
       deviceId: deviceId,
@@ -101,7 +110,12 @@ class LoggingManager {
   }
 
   /// Log channel error
-  void logChannelError(String deviceId, Object error, {StackTrace? stackTrace, Map<String, dynamic>? context}) {
+  void logChannelError(
+    String deviceId,
+    Object error, {
+    StackTrace? stackTrace,
+    Map<String, dynamic>? context,
+  }) {
     logger.error(
       'Channel error occurred',
       deviceId: deviceId,
@@ -112,7 +126,11 @@ class LoggingManager {
   }
 
   /// Log channel communication error
-  void logChannelCommunicationError(String deviceId, String operation, Object error) {
+  void logChannelCommunicationError(
+    String deviceId,
+    String operation,
+    Object error,
+  ) {
     logger.error(
       'Channel communication error during $operation',
       deviceId: deviceId,
@@ -122,7 +140,12 @@ class LoggingManager {
   }
 
   /// Log performance warning (slow operation)
-  void logPerformanceWarning(String deviceId, PerformanceOperationType operation, Duration duration, Duration threshold) {
+  void logPerformanceWarning(
+    String deviceId,
+    PerformanceOperationType operation,
+    Duration duration,
+    Duration threshold,
+  ) {
     logger.warn(
       'Slow $operation operation detected',
       deviceId: deviceId,
@@ -145,7 +168,12 @@ class LoggingManager {
   }
 
   /// Log transport error
-  void logTransportError(String deviceId, String transportType, Object error, {StackTrace? stackTrace}) {
+  void logTransportError(
+    String deviceId,
+    String transportType,
+    Object error, {
+    StackTrace? stackTrace,
+  }) {
     logger.error(
       'Transport error in $transportType',
       deviceId: deviceId,
@@ -169,7 +197,7 @@ class LoggingManager {
     if (_logger is FileLogger) {
       await (_logger as FileLogger).close();
     }
-    
+
     _performanceMonitor?.clearAllMetrics();
   }
 }

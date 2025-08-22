@@ -13,14 +13,16 @@ final class DeviceImpl extends Device {
 
   @override
   final String deviceId;
-  
+
   final TemplateOption template;
   final ChannelSession channelSession;
   final StreamController<DeviceBaseEvent> deviceEventController;
 
   final _values = HashMap<String, Object?>();
   final _valueControllers = HashMap<String, StreamController<Object?>>();
-  
+  // Single pending write per tagId. New writes will fail previous pending ones.
+  final _pendingWriteByTag = HashMap<String, _PendingWrite>();
+
   StreamSubscription<ChannelBaseEvent>? _channelSubscription;
 
   @override
@@ -41,6 +43,18 @@ final class DeviceImpl extends Device {
   }
 
   void _handleChannelEvent(ChannelBaseEvent event) {
+    // Handle write results first to resolve pending write futures
+    if (event is ChannelWriteResultEvent && event.deviceId == deviceId) {
+      final pending = _pendingWriteByTag.remove(event.tagId);
+      if (pending != null) {
+        pending.timer.cancel();
+        if (!pending.completer.isCompleted) {
+          pending.completer.complete(event.success);
+        }
+      }
+      return;
+    }
+
     if (event is ChannelUpdateEvent && event.deviceId == deviceId) {
       for (final point in event.updates) {
         if (point.deviceId == deviceId) {
@@ -50,13 +64,16 @@ final class DeviceImpl extends Device {
     }
   }
 
-  void _updateValue(String tagId, Object? value) {
-    _values[tagId] = value;
-    
-    // Notify listeners
-    final controller = _valueControllers[tagId];
-    if (controller != null && !controller.isClosed) {
-      controller.add(value);
+  void _updateValue(String tagId, Object? newValue) {
+    final oldValue = _values[tagId];
+
+    if (oldValue != newValue) {
+      _values[tagId] = newValue;
+
+      final controller = _valueControllers[tagId];
+      if (controller != null && !controller.isClosed) {
+        controller.add(newValue);
+      }
     }
   }
 
@@ -84,27 +101,34 @@ final class DeviceImpl extends Device {
   @override
   Future<bool> writeAsync(String tagId, Object? value) async {
     final completer = Completer<bool>();
-    
-    // Listen for write result
-    late StreamSubscription subscription;
-    subscription = channelSession.read.listen((event) {
-      if (event is ChannelWriteResultEvent && 
-          event.deviceId == deviceId) {
-        subscription.cancel();
-        completer.complete(event.success);
-      }
-    });
 
-    // Send write event
-    write(tagId, value);
-    
-    // Set timeout
-    Timer(const Duration(seconds: 10), () {
+    // Cancel existing pending write for this tag (new write overrides it)
+    final existed = _pendingWriteByTag.remove(tagId);
+    if (existed != null) {
+      existed.timer.cancel();
+      if (!existed.completer.isCompleted) {
+        existed.completer.complete(false);
+      }
+    }
+
+    // Register new pending write; result is completed in _handleChannelEvent
+    // Create timeout timer first, then store record
+    final timeoutTimer = Timer(const Duration(seconds: 10), () {
       if (!completer.isCompleted) {
-        subscription.cancel();
+        // Only clear if this completer is still the current one for the tag
+        final current = _pendingWriteByTag[tagId];
+        if (current != null && identical(current.completer, completer)) {
+          _pendingWriteByTag.remove(tagId);
+        }
         completer.complete(false);
       }
     });
+
+    final pending = (completer: completer, tagId: tagId, timer: timeoutTimer);
+    _pendingWriteByTag[tagId] = pending;
+
+    // Send write event
+    write(tagId, value);
 
     return completer.future;
   }
@@ -112,7 +136,7 @@ final class DeviceImpl extends Device {
   /// Dispose resources
   Future<void> dispose() async {
     stopListening();
-    
+
     for (final controller in _valueControllers.values) {
       await controller.close();
     }
@@ -120,3 +144,9 @@ final class DeviceImpl extends Device {
     _values.clear();
   }
 }
+
+typedef _PendingWrite = ({
+  Completer<bool> completer,
+  String tagId,
+  Timer timer,
+});

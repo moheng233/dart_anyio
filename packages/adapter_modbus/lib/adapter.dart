@@ -1,7 +1,4 @@
-import 'dart:isolate';
-
 import 'package:anyio_template/service.dart';
-import 'package:anyio_template/src/logger.dart';
 
 import 'src/protocol.dart';
 

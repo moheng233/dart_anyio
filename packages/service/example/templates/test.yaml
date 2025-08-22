@@ -14,5 +14,5 @@ template:
       function: 3
       interval_ms: 2000
       mapping:
-        - { to: n1, offset: 0, length: 1 }
-        - { to: n2, offset: 1, length: 1 }
+        - { to: n1, offset: 0, length: 1, endian: abcd }
+        - { to: n2, offset: 1, length: 1, endian: abcd, access: rw }

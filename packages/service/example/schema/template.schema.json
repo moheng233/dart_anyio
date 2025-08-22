@@ -1,1 +1,339 @@
-{"$schema":"http://json-schema.org/draft-07/schema#","title":"TemplateOption","type":"object","properties":{"info":{"$ref":"#/definitions/ChannelTempateInfo"},"template":{"$ref":"#/definitions/ChannelTemplateBase"},"points":{"type":"object","properties":{},"additionalProperties":{"$ref":"#/definitions/PointInfo"}},"meta":{"type":"object","properties":{},"additionalProperties":{}}},"required":["info","template","points"],"additionalProperties":false,"definitions":{"PointInfo":{"type":"object","properties":{"access":{"type":"string","enum":["r","rw","w"]},"display_name":{"oneOf":[{"type":"string"},{"type":"null"}]},"detailed":{"oneOf":[{"type":"string"},{"type":"null"}]},"type":{"type":"string","enum":["value","enum"]}},"required":["type"],"additionalProperties":true,"oneOf":[{"$ref":"#/definitions/PointInfoForValue"},{"$ref":"#/definitions/PointInfoForEnum"}]},"PointInfoForEnum":{"type":"object","properties":{"values":{"type":"object","properties":{},"additionalProperties":{"type":"number"}},"access":{"type":"string","enum":["r","rw","w"]},"display_name":{"oneOf":[{"type":"string"},{"type":"null"}]},"detailed":{"oneOf":[{"type":"string"},{"type":"null"}]},"type":{"type":"string","const":"enum"}},"required":["values","type"],"additionalProperties":false},"PointInfoForValue":{"type":"object","properties":{"read":{"oneOf":[{"type":"string"},{"type":"null"}]},"write":{"oneOf":[{"type":"string"},{"type":"null"}]},"access":{"type":"string","enum":["r","rw","w"]},"display_name":{"oneOf":[{"type":"string"},{"type":"null"}]},"detailed":{"oneOf":[{"type":"string"},{"type":"null"}]},"type":{"type":"string","const":"value"}},"required":["type"],"additionalProperties":false},"ChannelTemplateBase":{"type":"object","properties":{"type":{"type":"string","enum":["modbus"]}},"required":["type"],"additionalProperties":true,"oneOf":[{"$ref":"#/definitions/ChannelTemplateForModbus"}]},"ChannelTemplateForModbus":{"type":"object","properties":{"polls":{"type":"array","items":{"$ref":"#/definitions/ModbusPoll"}},"type":{"type":"string","const":"modbus"}},"required":["polls","type"],"additionalProperties":false},"ModbusPoll":{"type":"object","properties":{"interval_ms":{"type":"integer"},"function":{"type":"integer"},"begin":{"type":"integer"},"length":{"type":"integer"},"mapping":{"type":"array","items":{"$ref":"#/definitions/ModbusPoint"}}},"required":["interval_ms","function","begin","length","mapping"],"additionalProperties":false},"ModbusPoint":{"type":"object","properties":{"to":{"type":"string"},"offset":{"type":"integer"},"scale":{"type":"number","default":1.0},"length":{"type":"integer","default":1},"endian":{"type":"string","enum":["abcd","dcba","badc","cdab"]},"type":{"type":"string","enum":["bool","int","uint","float"]},"access":{"type":"string","enum":["r","rw","w"]}},"required":["to","offset"],"additionalProperties":false},"ChannelTempateInfo":{"type":"object","properties":{"name":{"type":"string"},"version":{"type":"string"},"display_name":{"type":"object","properties":{},"additionalProperties":{"type":"string"}}},"required":["name","version"],"additionalProperties":false}}}
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "TemplateOption",
+    "type": "object",
+    "properties": {
+        "info": {
+            "$ref": "#/definitions/ChannelTempateInfo"
+        },
+        "template": {
+            "$ref": "#/definitions/ChannelTemplateBase"
+        },
+        "points": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {
+                "$ref": "#/definitions/PointInfo"
+            }
+        },
+        "meta": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {}
+        }
+    },
+    "required": [
+        "info",
+        "template",
+        "points"
+    ],
+    "additionalProperties": false,
+    "definitions": {
+        "PointInfo": {
+            "type": "object",
+            "properties": {
+                "access": {
+                    "type": "string",
+                    "enum": [
+                        "r",
+                        "rw",
+                        "w"
+                    ]
+                },
+                "display_name": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "detailed": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "value",
+                        "enum"
+                    ]
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "additionalProperties": true,
+            "oneOf": [
+                {
+                    "$ref": "#/definitions/PointInfoForValue"
+                },
+                {
+                    "$ref": "#/definitions/PointInfoForEnum"
+                }
+            ]
+        },
+        "PointInfoForEnum": {
+            "type": "object",
+            "properties": {
+                "values": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                },
+                "access": {
+                    "type": "string",
+                    "enum": [
+                        "r",
+                        "rw",
+                        "w"
+                    ]
+                },
+                "display_name": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "detailed": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "type": {
+                    "type": "string",
+                    "const": "enum"
+                }
+            },
+            "required": [
+                "values",
+                "type"
+            ],
+            "additionalProperties": false
+        },
+        "PointInfoForValue": {
+            "type": "object",
+            "properties": {
+                "read": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "write": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "access": {
+                    "type": "string",
+                    "enum": [
+                        "r",
+                        "rw",
+                        "w"
+                    ]
+                },
+                "display_name": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "detailed": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "type": {
+                    "type": "string",
+                    "const": "value"
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "additionalProperties": false
+        },
+        "ChannelTemplateBase": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "modbus"
+                    ]
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "additionalProperties": true,
+            "oneOf": [
+                {
+                    "$ref": "#/definitions/ChannelTemplateForModbus"
+                }
+            ]
+        },
+        "ChannelTemplateForModbus": {
+            "type": "object",
+            "properties": {
+                "polls": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ModbusPoll"
+                    }
+                },
+                "type": {
+                    "type": "string",
+                    "const": "modbus"
+                }
+            },
+            "required": [
+                "polls",
+                "type"
+            ],
+            "additionalProperties": false
+        },
+        "ModbusPoll": {
+            "type": "object",
+            "properties": {
+                "interval_ms": {
+                    "type": "integer"
+                },
+                "function": {
+                    "type": "integer"
+                },
+                "begin": {
+                    "type": "integer"
+                },
+                "length": {
+                    "type": "integer"
+                },
+                "mapping": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ModbusPoint"
+                    }
+                }
+            },
+            "required": [
+                "interval_ms",
+                "function",
+                "begin",
+                "length",
+                "mapping"
+            ],
+            "additionalProperties": false
+        },
+        "ModbusPoint": {
+            "type": "object",
+            "properties": {
+                "to": {
+                    "type": "string"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "scale": {
+                    "type": "number",
+                    "default": 1.0
+                },
+                "length": {
+                    "type": "integer",
+                    "default": 1
+                },
+                "endian": {
+                    "type": "string",
+                    "enum": [
+                        "abcd",
+                        "dcba",
+                        "badc",
+                        "cdab"
+                    ]
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "bool",
+                        "int",
+                        "uint",
+                        "float"
+                    ]
+                },
+                "access": {
+                    "type": "string",
+                    "enum": [
+                        "r",
+                        "rw",
+                        "w"
+                    ]
+                }
+            },
+            "required": [
+                "to",
+                "offset"
+            ],
+            "additionalProperties": false
+        },
+        "ChannelTempateInfo": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                },
+                "display_name": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            },
+            "required": [
+                "name",
+                "version"
+            ],
+            "additionalProperties": false
+        }
+    }
+}

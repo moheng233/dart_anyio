@@ -1,11 +1,11 @@
-import 'dart:io';
 
 import 'package:anyio_service/service.dart';
+import 'package:anyio_template/service.dart';
 
 /// Example demonstrating logging and performance monitoring features
 Future<void> main() async {
   // Initialize logging system with both console and file logging
-  final consoleLogger = ConsoleLogger(globalLevel: LogLevel.info);
+  final consoleLogger = ConsoleLogger();
   final fileLogger = FileLogger(
     logFilePath: 'logs/service.log',
     globalLevel: LogLevel.debug,
@@ -13,20 +13,17 @@ Future<void> main() async {
   final multiLogger = MultiLogger([consoleLogger, fileLogger]);
   
   // Initialize performance monitoring
-  final performanceMonitor = PerformanceMonitor(maxHistorySize: 1000);
+  final performanceMonitor = PerformanceMonitor();
   
   // Create service manager with logging and performance monitoring
   final serviceManager = ServiceManager(
-    channelManager: ChannelManagerImpl(useIsolatedChannels: true),
+    channelManager: ChannelManagerImpl(),
     transportManager: TransportManagerImpl(),
-    enableChannelRestart: true,
-    maxRestartAttempts: 3,
-    restartDelaySeconds: 5,
     logger: multiLogger,
     performanceMonitor: performanceMonitor,
     performanceThresholds: {
-      PerformanceOperationType.poll: Duration(milliseconds: 100),
-      PerformanceOperationType.write: Duration(milliseconds: 50),
+      PerformanceOperationType.poll: const Duration(milliseconds: 100),
+      PerformanceOperationType.write: const Duration(milliseconds: 50),
     },
   );
 
@@ -129,14 +126,14 @@ Future<void> _simulateChannelOperations(PerformanceMonitor perfMon) async {
   print('Simulating channel operations...');
   
   // Simulate multiple poll cycles
-  for (int cycle = 0; cycle < 5; cycle++) {
+  for (var cycle = 0; cycle < 5; cycle++) {
     final pollCycleId = 'cycle_$cycle';
     
     // Simulate a poll cycle
     final pollTimer = perfMon.startPollTimer('device1', pollCycleId: pollCycleId);
     
     // Simulate poll units within the cycle
-    for (int unit = 0; unit < 3; unit++) {
+    for (var unit = 0; unit < 3; unit++) {
       final pollUnitTimer = perfMon.startPollUnitTimer(
         'device1', 
         unit, 
@@ -161,15 +158,15 @@ Future<void> _simulateChannelOperations(PerformanceMonitor perfMon) async {
       final writeTimer = perfMon.startWriteTimer('device1', 
           details: {'tag': 'output_register', 'value': cycle});
       
-      await Future.delayed(Duration(milliseconds: 15));
+      await Future.delayed(const Duration(milliseconds: 15));
       writeTimer.complete();
     }
   }
   
   // Simulate some operations for device2
-  for (int i = 0; i < 3; i++) {
+  for (var i = 0; i < 3; i++) {
     final pollTimer = perfMon.startPollTimer('device2');
-    await Future.delayed(Duration(milliseconds: 20));
+    await Future.delayed(const Duration(milliseconds: 20));
     
     // Simulate occasional failures
     if (i == 1) {

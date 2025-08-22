@@ -2,12 +2,12 @@ import 'package:dart_mappable/dart_mappable.dart';
 import 'package:meta/meta.dart';
 
 import 'point.dart';
-import 'template.dart';
 
 part 'event.mapper.dart';
 
 @immutable
-sealed class ChannelBaseEvent {
+@MappableClass()
+sealed class ChannelBaseEvent with ChannelBaseEventMappable {
   const ChannelBaseEvent();
 
   String get deviceId;
@@ -28,15 +28,17 @@ final class ChannelUpdateEvent extends ChannelBaseEvent
 @MappableClass()
 final class ChannelWriteResultEvent extends ChannelBaseEvent
     with ChannelWriteResultEventMappable {
-  const ChannelWriteResultEvent(this.deviceId, {required this.success});
+  const ChannelWriteResultEvent(this.deviceId, this.tagId, {required this.success});
 
   @override
   final String deviceId;
+  final String tagId;
   final bool success;
 }
 
 @immutable
-sealed class DeviceBaseEvent {
+@MappableClass()
+sealed class DeviceBaseEvent with DeviceBaseEventMappable {
   const DeviceBaseEvent();
 }
 

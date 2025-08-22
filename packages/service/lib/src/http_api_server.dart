@@ -1,6 +1,10 @@
+// ignore_for_file: avoid_print
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+
+// ...existing imports...
 
 import 'package:anyio_template/service.dart';
 
@@ -65,51 +69,71 @@ class HttpApiServer {
       switch (request.method) {
         case 'GET':
           _handleGetRequest(request, segments);
-          break;
+          return;
         case 'POST':
           _handlePostRequest(request, segments);
-          break;
+          return;
         default:
-          _sendError(request.response, HttpStatus.methodNotAllowed, 'Method not allowed');
+          _sendError(
+            request.response,
+            HttpStatus.methodNotAllowed,
+            'Method not allowed',
+          );
+          return;
       }
-    } catch (e) {
-      _sendError(request.response, HttpStatus.internalServerError, 'Internal server error: $e');
+    } on Exception catch (e) {
+      _sendError(
+        request.response,
+        HttpStatus.internalServerError,
+        'Internal server error: $e',
+      );
     }
   }
 
   void _handleGetRequest(HttpRequest request, List<String> segments) {
     if (segments.isEmpty) {
-      _sendJson(request.response, {'message': 'AnyIO Service API', 'version': '1.0.0'});
+      _sendJson(request.response, {
+        'message': 'AnyIO Service API',
+        'version': '1.0.0',
+      });
       return;
     }
 
     switch (segments[0]) {
       case 'devices':
         _handleDevicesGet(request, segments);
-        break;
+        return;
       case 'history':
         _handleHistoryGet(request, segments);
-        break;
+        return;
       case 'stats':
         _handleStatsGet(request, segments);
-        break;
+        return;
       case 'health':
-        _sendJson(request.response, {'status': 'ok', 'timestamp': DateTime.now().toIso8601String()});
-        break;
+        _sendJson(request.response, {
+          'status': 'ok',
+          'timestamp': DateTime.now().toIso8601String(),
+        });
+        return;
       default:
         _sendError(request.response, HttpStatus.notFound, 'Endpoint not found');
+        return;
     }
   }
 
   void _handleDevicesGet(HttpRequest request, List<String> segments) {
     if (segments.length == 1) {
       // GET /devices - list all devices
-      final devices = serviceManager.devices.map((device) => {
-        'deviceId': device.deviceId,
-        'points': device.points.length,
-        'template': device.template.info.name,
-      }).toList();
-      
+      final devices = serviceManager.devices
+          .map(
+            (device) => {
+              'deviceId': device.deviceId,
+              'points': device.points.length,
+              'template': device.template.info.name,
+            },
+          )
+          .toList();
+
       _sendJson(request.response, {'devices': devices});
       return;
     }
@@ -117,9 +141,13 @@ class HttpApiServer {
     if (segments.length >= 2) {
       final deviceId = segments[1];
       final device = serviceManager.getDevice(deviceId);
-      
+
       if (device == null) {
-        _sendError(request.response, HttpStatus.notFound, 'Device not found: $deviceId');
+        _sendError(
+          request.response,
+          HttpStatus.notFound,
+          'Device not found: $deviceId',
+        );
         return;
       }
 
@@ -131,12 +159,9 @@ class HttpApiServer {
           'templateVersion': device.template.info.version,
           'displayName': device.template.info.displayName,
           'values': device.values,
-          'points': device.template.points.map((key, value) => MapEntry(key, {
-            'type': value.runtimeType.toString(),
-            'access': value.access.toString(),
-            'displayName': value.displayName,
-            'detailed': value.detailed,
-          })),
+          'points': device.template.points.map(
+            (key, value) => MapEntry(key, value.toMap()),
+          ),
         });
         return;
       }
@@ -147,19 +172,23 @@ class HttpApiServer {
           case 'values':
             // GET /devices/{deviceId}/values - get all values
             _sendJson(request.response, device.values);
-            break;
           case 'points':
             // GET /devices/{deviceId}/points - get point definitions
-            final points = device.template.points.map((key, value) => MapEntry(key, {
-              'type': value.runtimeType.toString(),
-              'access': value.access.toString(),
-              'displayName': value.displayName,
-              'detailed': value.detailed,
-            }));
+            final points = device.template.points.map(
+              (key, value) => MapEntry(key, {
+                'type': value.runtimeType.toString(),
+                'access': value.access.toString(),
+                'displayName': value.displayName,
+                'detailed': value.detailed,
+              }),
+            );
             _sendJson(request.response, points);
-            break;
           default:
-            _sendError(request.response, HttpStatus.notFound, 'Command not found: $command');
+            _sendError(
+              request.response,
+              HttpStatus.notFound,
+              'Command not found: $command',
+            );
         }
         return;
       }
@@ -176,18 +205,109 @@ class HttpApiServer {
             'timestamp': DateTime.now().toIso8601String(),
           });
         } else {
-          _sendError(request.response, HttpStatus.notFound, 'Point not found: $pointId');
+          _sendError(
+            request.response,
+            HttpStatus.notFound,
+            'Point not found: $pointId',
+          );
         }
+        return;
+      }
+
+      if (segments.length == 5 &&
+          segments[2] == 'points' &&
+          segments[4] == 'events') {
+        // GET /devices/{deviceId}/points/{pointId}/events - SSE stream of point updates
+        final pointId = segments[3];
+
+        if (!device.template.points.containsKey(pointId)) {
+          _sendError(
+            request.response,
+            HttpStatus.notFound,
+            'Point not found: $pointId',
+          );
+          return;
+        }
+
+        unawaited(_startSseForPoint(request, device, deviceId, pointId));
         return;
       }
     }
 
-    _sendError(request.response, HttpStatus.badRequest, 'Invalid devices API path');
+    _sendError(
+      request.response,
+      HttpStatus.badRequest,
+      'Invalid devices API path',
+    );
+  }
+
+  Future<void> _startSseForPoint(
+    HttpRequest request,
+    Device device,
+    String deviceId,
+    String pointId,
+  ) async {
+    final response = request.response
+      // SSE headers
+      ..statusCode = HttpStatus.ok;
+    response.headers
+      ..set('Content-Type', 'text/event-stream')
+      ..set('Cache-Control', 'no-cache, no-transform')
+      ..set('Connection', 'keep-alive')
+      ..set('X-Accel-Buffering', 'no'); // disable proxy buffering if any
+
+    // Optional: reconnection time for clients (ms)
+    response.write('retry: 5000\r\n\r\n');
+
+    await response.flush();
+
+    void sendEvent(Object? value) {
+      final payload = jsonEncode({
+        'deviceId': deviceId,
+        'pointId': pointId,
+        'value': value,
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+      response
+        ..write('event: update\r\n')
+        ..write('data: $payload\r\n\r\n')
+        ..flush();
+    }
+
+    // Send current value immediately
+    sendEvent(device.read(pointId));
+
+    // Subscribe to point updates
+    final sub = device
+        .listen(pointId)
+        .listen(
+          sendEvent,
+          onError: (_) {},
+        );
+
+    // Heartbeat to keep connection alive
+    final heartbeat = Timer.periodic(const Duration(seconds: 15), (_) {
+      response
+        ..write(': keepalive\r\n\r\n')
+        ..flush();
+    });
+
+    // Cleanup when client disconnects
+    unawaited(
+      response.done.whenComplete(() {
+        heartbeat.cancel();
+        sub.cancel();
+      }),
+    );
   }
 
   void _handleHistoryGet(HttpRequest request, List<String> segments) {
     if (timeSeriesDb == null) {
-      _sendError(request.response, HttpStatus.serviceUnavailable, 'Time-series database not available');
+      _sendError(
+        request.response,
+        HttpStatus.serviceUnavailable,
+        'Time-series database not available',
+      );
       return;
     }
 
@@ -198,11 +318,15 @@ class HttpApiServer {
 
     final deviceId = segments[1];
     final pointId = segments.length > 2 ? segments[2] : null;
-    
+
     // Parse query parameters
     final queryParams = request.uri.queryParameters;
-    final startTime = queryParams['start'] != null ? DateTime.tryParse(queryParams['start']!) : null;
-    final endTime = queryParams['end'] != null ? DateTime.tryParse(queryParams['end']!) : null;
+    final startTime = queryParams['start'] != null
+        ? DateTime.tryParse(queryParams['start']!)
+        : null;
+    final endTime = queryParams['end'] != null
+        ? DateTime.tryParse(queryParams['end']!)
+        : null;
     final limit = int.tryParse(queryParams['limit'] ?? '1000') ?? 1000;
 
     final query = HistoryQuery(
@@ -213,26 +337,34 @@ class HttpApiServer {
       limit: limit,
     );
 
-    timeSeriesDb!.queryHistory(query).then((points) {
-      _sendJson(request.response, {
-        'deviceId': deviceId,
-        'pointId': pointId,
-        'query': {
-          'startTime': startTime?.toIso8601String(),
-          'endTime': endTime?.toIso8601String(),
-          'limit': limit,
-        },
-        'data': points.map((p) => p.toJson()).toList(),
-      });
-    }).catchError((e) {
-      _sendError(request.response, HttpStatus.internalServerError, 'Failed to query history: $e');
-    });
+    timeSeriesDb!
+        .queryHistory(query)
+        .then((points) {
+          _sendJson(request.response, {
+            'deviceId': deviceId,
+            'pointId': pointId,
+            'query': {
+              'startTime': startTime?.toIso8601String(),
+              'endTime': endTime?.toIso8601String(),
+              'limit': limit,
+            },
+            'data': points.map((p) => p.toJson()).toList(),
+          });
+        })
+        .catchError((dynamic e) {
+          _sendError(
+            request.response,
+            HttpStatus.internalServerError,
+            'Failed to query history: $e',
+          );
+        });
   }
 
   void _handleStatsGet(HttpRequest request, List<String> segments) {
     if (timeSeriesDb is InMemoryTimeSeriesDatabase) {
-      final stats = (timeSeriesDb as InMemoryTimeSeriesDatabase).getStatistics();
-      _sendJson(request.response, stats);
+      final stats = (timeSeriesDb! as InMemoryTimeSeriesDatabase)
+          .getStatistics();
+      _sendJson(request.response, stats.toJson());
     } else {
       _sendJson(request.response, {
         'devices': serviceManager.devices.length,
@@ -241,27 +373,44 @@ class HttpApiServer {
     }
   }
 
-  Future<void> _handlePostRequest(HttpRequest request, List<String> segments) async {
+  Future<void> _handlePostRequest(
+    HttpRequest request,
+    List<String> segments,
+  ) async {
     if (segments.length >= 2 && segments[0] == 'devices') {
       final deviceId = segments[1];
       final device = serviceManager.getDevice(deviceId);
-      
+
       if (device == null) {
-        _sendError(request.response, HttpStatus.notFound, 'Device not found: $deviceId');
+        _sendError(
+          request.response,
+          HttpStatus.notFound,
+          'Device not found: $deviceId',
+        );
         return;
       }
 
-      if (segments.length == 3 && segments[2] == 'write') {
-        // POST /devices/{deviceId}/write - write to device
+      // POST /devices/{deviceId}/points/{pointId} - write value to a point
+      if (segments.length == 4 && segments[2] == 'points') {
+        final pointId = segments[3];
+
         final content = await _readRequestBody(request);
-        final data = jsonDecode(content) as Map<String, dynamic>;
-        
-        final pointId = data['pointId'] as String?;
-        final value = data['value'];
-        
-        if (pointId == null) {
-          _sendError(request.response, HttpStatus.badRequest, 'Missing pointId');
+        if (content.trim().isEmpty) {
+          _sendError(
+            request.response,
+            HttpStatus.badRequest,
+            'Request body is empty',
+          );
           return;
+        }
+
+        Object? value;
+        try {
+          // Accept plain JSON scalar or structured JSON
+          value = jsonDecode(content);
+        } on FormatException {
+          // Fallback to raw string
+          value = content;
         }
 
         try {
@@ -273,39 +422,49 @@ class HttpApiServer {
             'value': value,
             'timestamp': DateTime.now().toIso8601String(),
           });
-        } catch (e) {
-          _sendError(request.response, HttpStatus.internalServerError, 'Write failed: $e');
+        } on Exception catch (e) {
+          _sendError(
+            request.response,
+            HttpStatus.internalServerError,
+            'Write failed: $e',
+          );
         }
         return;
       }
     }
 
-    _sendError(request.response, HttpStatus.badRequest, 'Invalid POST endpoint');
+    _sendError(
+      request.response,
+      HttpStatus.badRequest,
+      'Invalid POST endpoint',
+    );
   }
 
   Future<String> _readRequestBody(HttpRequest request) async {
     final completer = Completer<String>();
     final buffer = <int>[];
-    
+
     request.listen(
-      (data) => buffer.addAll(data),
+      buffer.addAll,
       onDone: () => completer.complete(utf8.decode(buffer)),
       onError: completer.completeError,
     );
-    
+
     return completer.future;
   }
 
   void _sendJson(HttpResponse response, Object data) {
     response.headers.contentType = ContentType.json;
-    response.write(jsonEncode(data));
-    response.close();
+    response
+      ..write(jsonEncode(data))
+      ..close();
   }
 
   void _sendError(HttpResponse response, int statusCode, String message) {
     response.statusCode = statusCode;
     response.headers.contentType = ContentType.json;
-    response.write(jsonEncode({'error': message}));
-    response.close();
+    response
+      ..write(jsonEncode({'error': message}))
+      ..close();
   }
 }
