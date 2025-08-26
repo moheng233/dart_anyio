@@ -28,7 +28,7 @@ final class TemplateOption with TemplateOptionMappable {
   final ChannelTempateInfo info;
   final Map<String, Object?> meta;
   final ChannelTemplateBase template;
-  final Map<String, PointInfo> points;
+  final Map<String, VariableInfo> points;
 }
 
 @MappableClass(discriminatorKey: 'type')
@@ -65,7 +65,6 @@ final class DeviceOption with DeviceOptionMappable {
     required this.name,
     required this.template,
     required this.channel,
-    required this.transportOption,
     this.displayName,
     this.meta = const {},
   });
@@ -73,7 +72,6 @@ final class DeviceOption with DeviceOptionMappable {
   final String name;
   final String template;
   final ChannelOptionBase channel;
-  final TransportOptionBase transportOption;
   final String? displayName;
   final Map<String, Object?> meta;
 }

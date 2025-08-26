@@ -194,8 +194,9 @@ class LoggingManager {
 
   /// Shutdown the logging system
   Future<void> shutdown() async {
-    if (_logger is FileLogger) {
-      await (_logger as FileLogger).close();
+    final logger = _logger;
+    if (logger is FileLogger) {
+      await logger.close();
     }
 
     _performanceMonitor?.clearAllMetrics();

@@ -121,7 +121,7 @@ class ChannelPerformanceStats {
   Duration _minDuration = const Duration(days: 1);
   Duration _maxDuration = Duration.zero;
 
-  final Map<PerformanceOperationType, _OperationStats> _operationStats = {};
+  final Map<PerformanceOperationType, OperationStats> _operationStats = {};
 
   DateTime? _firstMetric;
   DateTime? _lastMetric;
@@ -172,12 +172,12 @@ class ChannelPerformanceStats {
   }
 
   /// Get statistics for a specific operation type
-  _OperationStats? getOperationStats(PerformanceOperationType type) {
+  OperationStats? getOperationStats(PerformanceOperationType type) {
     return _operationStats[type];
   }
 
   /// Get all operation type statistics
-  Map<PerformanceOperationType, _OperationStats> get operationStats =>
+  Map<PerformanceOperationType, OperationStats> get operationStats =>
       Map.unmodifiable(_operationStats);
 
   void _updateWith(PerformanceMetric metric) {
@@ -204,10 +204,10 @@ class ChannelPerformanceStats {
 
     // Update operation-specific stats
 
-    _operationStats
+  _operationStats
         .putIfAbsent(
           metric.operationType,
-          _OperationStats.new,
+      OperationStats.new,
         )
         ._updateWith(metric);
   }
@@ -223,7 +223,7 @@ class ChannelPerformanceStats {
 }
 
 /// Statistics for a specific operation type
-class _OperationStats {
+class OperationStats {
   int count = 0;
   int successCount = 0;
   int failureCount = 0;
@@ -260,7 +260,7 @@ class _OperationStats {
 
   @override
   String toString() {
-    return '_OperationStats(count: $count, '
+  return 'OperationStats(count: $count, '
         'successRate: ${(successRate * 100).toStringAsFixed(1)}%, '
         'avgDuration: ${averageDuration.inMilliseconds}ms)';
   }

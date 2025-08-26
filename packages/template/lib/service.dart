@@ -4,4 +4,3 @@ export 'src/event.dart';
 export 'src/logger.dart';
 export 'src/point.dart';
 export 'src/template.dart';
-export 'src/transport.dart';

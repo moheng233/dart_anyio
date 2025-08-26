@@ -29,8 +29,21 @@ final class ModbusClient {
       _responeFrom = ModbusTcpResponseParser();
     }
 
-    _responeFrom.bind(read).listen(_onRespone);
-    write.addStream(_requestTo.bind(_request.stream));
+    _responeFrom
+        .bind(read)
+        .listen(
+          _onRespone,
+          onError: (Object error, StackTrace stackTrace) {
+            // Swallow parser errors here; upper layers handle connection lifecycle
+            // via socket.done in the adapter. Pending requests will timeout.
+          },
+        );
+
+    _requestTo
+        .bind(_request.stream)
+        .listen(
+          write.add,
+        );
   }
 
   final bool isRtu;

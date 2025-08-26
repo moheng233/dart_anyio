@@ -1,20 +1,2 @@
-import 'package:anyio_template/service.dart';
-
-import 'src/protocol.dart';
-
+// Re-export Modbus adapter isolate handler
 export 'src/protocol.dart';
-
-final class AdapterPluginForModbus extends AdapterPluginBase {
-  @override
-  String get name => 'Modbus';
-  @override
-  String get version => '1.0.0';
-
-  @override
-  Future<void> up(ChannelManager manager, Logger logger) async {
-    manager.registerFactory(ChannelFactoryForModbus());
-  }
-
-  @override
-  Future<void> down(ChannelManager manager) async {}
-}

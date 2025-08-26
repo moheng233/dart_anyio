@@ -8,6 +8,34 @@ import 'package:dart_mappable/dart_mappable.dart';
 
 part 'template.mapper.dart';
 
+@MappableClass(discriminatorValue: 'modbus')
+final class ChannelOptionForModbus extends ChannelOptionBase
+    with ChannelOptionForModbusMappable {
+  const ChannelOptionForModbus({
+    required this.isRtu,
+    required this.unitId,
+    required this.transport,
+  });
+
+  final bool isRtu;
+  final int unitId;
+
+  /// 连接方式：tcp 或 unixsocket
+  final ModbusTransportOption transport;
+}
+
+@MappableClass(discriminatorValue: 'modbus')
+final class ChannelTemplateForModbus extends ChannelTemplateBase
+    with ChannelTemplateForModbusMappable {
+  const ChannelTemplateForModbus({
+    required this.polls,
+    this.pushes = const [],
+  });
+
+  final List<ModbusPoll> polls;
+  final List<ModbusPush> pushes;
+}
+
 @MappableEnum(caseStyle: CaseStyle.lowerCase)
 enum ModbusEndianType {
   /// ABCD: 大端序，字节顺序 [A,B,C,D] - 标准大端
@@ -28,38 +56,23 @@ enum ModbusEndianType {
   final bool swap;
 }
 
-@MappableEnum(caseStyle: CaseStyle.lowerCase)
-enum ModbusAccessType {
-  r(),
-  rw(write: true),
-  w(read: false, write: true);
-
-  const ModbusAccessType({this.read = true, this.write = false});
-
-  final bool read;
-  final bool write;
-}
-
-@MappableClass(discriminatorValue: 'modbus')
-final class ChannelOptionForModbus extends ChannelOptionBase
-    with ChannelOptionForModbusMappable {
-  const ChannelOptionForModbus({
-    required this.isRtu,
-    required this.unitId,
+@MappableClass()
+final class ModbusPoint with ModbusPointMappable {
+  const ModbusPoint({
+    required this.to,
+    required this.offset,
+    this.scale = 1,
+    this.length = 1,
+    this.endian = ModbusEndianType.abcd,
+  this.type = VariableType.uint,
   });
 
-  final bool isRtu;
-  final int unitId;
-}
-
-@MappableClass(discriminatorValue: 'modbus')
-final class ChannelTemplateForModbus extends ChannelTemplateBase
-    with ChannelTemplateForModbusMappable {
-  const ChannelTemplateForModbus({
-    required this.polls,
-  });
-
-  final List<ModbusPoll> polls;
+  final String to;
+  final int offset;
+  final double scale;
+  final int length;
+  final ModbusEndianType endian;
+  final VariableType type;
 }
 
 @MappableClass()
@@ -70,32 +83,77 @@ final class ModbusPoll with ModbusPollMappable {
     required this.begin,
     required this.length,
     required this.mapping,
+    this.displayName,
   });
 
-  final int intervalMs;
+  final String? displayName;
   final int function;
   final int begin;
   final int length;
+  final int intervalMs;
   final List<ModbusPoint> mapping;
 }
 
+/// Modbus 下发（push）配置（扁平结构）
+///
+/// 单条 push 即描述“从网关点位[from]取值，按[type/length/endian/scale]
+/// 编码后写入功能码[function]的地址[begin + offset]”。
 @MappableClass()
-final class ModbusPoint with ModbusPointMappable {
-  const ModbusPoint({
-    required this.to,
-    required this.offset,
+final class ModbusPush with ModbusPushMappable {
+  const ModbusPush({
+    required this.from,
+    required this.function,
+    required this.begin,
     this.scale = 1,
     this.length = 1,
     this.endian = ModbusEndianType.abcd,
-    this.type = PointType.uint,
-    this.access = ModbusAccessType.r,
+  this.type = VariableType.uint,
   });
 
-  final String to;
-  final int offset;
+  /// 网关内部点位标识（作为写入源）
+  final String from;
+
+  /// 功能码：1=线圈(coil)，3=保持寄存器(holding register)
+  final int function;
+
+  /// 起始地址基准
+  final int begin;
+
+  /// 缩放（编码前先应用 scale）
   final double scale;
+
+  /// 数据长度（寄存器数量：1/2/4/8，对线圈为1）
   final int length;
+
+  /// 字节序/字交换策略
   final ModbusEndianType endian;
-  final PointType type;
-  final ModbusAccessType access;
+
+  /// 数据类型（int/uint/float 等）
+  final VariableType type;
+}
+
+@MappableClass(discriminatorValue: 'tcp')
+final class ModbusTcpOption extends ModbusTransportOption
+    with ModbusTcpOptionMappable {
+  const ModbusTcpOption({required this.host, required this.port});
+  final String host;
+  final int port;
+}
+
+@MappableClass(discriminatorKey: 'type')
+sealed class ModbusTransportOption with ModbusTransportOptionMappable {
+  const ModbusTransportOption();
+}
+
+@MappableEnum(caseStyle: CaseStyle.lowerCase)
+enum ModbusTransportType {
+  tcp(),
+  unixsocket(),
+}
+
+@MappableClass(discriminatorValue: 'unixsocket')
+final class ModbusUnixSocketOption extends ModbusTransportOption
+    with ModbusUnixSocketOptionMappable {
+  const ModbusUnixSocketOption({required this.path});
+  final String path;
 }

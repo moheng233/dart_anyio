@@ -1,18 +1,26 @@
-# yaml-language-server: $schema=../schema/template.schema.json
 info:
   name: test
   version: "1.0"
 meta: {}
 points:
   n1: { type: value }
-  n2: { type: enum, access: rw, values: { 关机: 0, 开机: 1 } }
+  n2: { type: enum, values: { 关机: 0, 开机: 1 } }
+actions:
+  n2: { type: value }
 template:
   type: modbus
   polls:
     - begin: 0
-      length: 5
+      length: 1
       function: 3
-      interval_ms: 2000
+      interval_ms: 1000
       mapping:
         - { to: n1, offset: 0, length: 1, endian: abcd }
-        - { to: n2, offset: 1, length: 1, endian: abcd, access: rw }
+    - begin: 1
+      length: 1
+      function: 3
+      interval_ms: 1500
+      mapping:
+        - { to: n2, offset: 0, length: 1, endian: abcd }
+  pushs:
+    - { from: n2, function: 3, begin: 1 }

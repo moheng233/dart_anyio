@@ -4,6 +4,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:anyio_adapter_modbus/src/protocol.dart';
+import 'package:anyio_adapter_modbus/src/template.dart';
 import 'package:anyio_service/service.dart';
 import 'package:anyio_template/service.dart';
 
@@ -34,96 +35,69 @@ Future<void> main(List<String> args) async {
   print('Template directory: ${templateDirectory.path}');
   print('HTTP API port: $httpPort');
 
-  // Initialize managers with isolated channels enabled
-  final transportManager = TransportManagerImpl();
-  final channelManager = ChannelManagerImpl(useIsolatedChannels: false);
-
-  // Register transport factories
-  transportManager.register(TransportFactoryForTcpImpl());
-
-  // Register channel factories
-  channelManager.registerFactory(ChannelFactoryForModbus());
-
-  // Create service manager with channel restart enabled
-  final serviceManager = ServiceManager(
-    channelManager: channelManager,
-    transportManager: transportManager,
+  // Register channel factory (Modbus) with new handler + mappers
+  ChannelManagerImpl.registerFactory<
+    ChannelOptionForModbus,
+    ChannelTemplateForModbus
+  >(
+    'modbus',
+    modbusChannelFactoryHandler,
+    channelOptionMapper: ChannelOptionForModbusMapper.ensureInitialized(),
+    templateOptionMapper: ChannelTemplateForModbusMapper.ensureInitialized(),
   );
 
-  // Initialize time-series database
-  final timeSeriesDb = InMemoryTimeSeriesDatabase();
-  final dataCollector = DataCollector(timeSeriesDb: timeSeriesDb);
-
-  // Create HTTP API server
-  final httpServer = HttpApiServer(
-    serviceManager: serviceManager,
-    timeSeriesDb: timeSeriesDb,
-    port: httpPort,
-  );
+  final logger = LoggingManager.instance
+    ..initialize(logger: ConsoleLogger(globalLevel: LogLevel.debug));
 
   try {
     // Load configuration and templates
     print('Loading service configuration...');
-    final serviceConfig = await serviceManager.loadServiceConfig(deviceFile);
+    final serviceConfig = await ServiceManager.loadServiceConfig(deviceFile);
 
     print('Loading device templates...');
-    final templates = await serviceManager.loadTemplates(templateDirectory);
+    final templates = await ServiceManager.loadTemplates(templateDirectory);
 
     print('Found ${templates.length} templates: ${templates.keys.join(', ')}');
     print('Found ${serviceConfig.devices.length} devices');
 
-    // Start data collector
-    print('Starting data collector...');
-    await dataCollector.start();
+    // Initialize channels (spawn adapter isolates and sessions)
+    print('Starting channels...');
+    final channelManager = await ChannelManagerImpl.initialize(
+      serviceConfig,
+      templates,
+    );
 
-    // Start service
-    print('Starting devices...');
-    await serviceManager.start(serviceConfig, templates);
+    channelManager.listenEvent<ChannelPerformanceEvent>().listen(print);
 
-    // Setup data collection from devices
-    for (final device in serviceManager.devices) {
-      // Listen to channel events for this device
-      // final session = serviceManager.getChannelSession(device.deviceId);
-      // if (session != null) {
-      //   session.read.listen((event) {
-      //     if (event is ChannelUpdateEvent &&
-      //         event.deviceId == device.deviceId) {
-      //       for (final point in event.updates) {
-      //         dataCollector.collectPoint(
-      //           point.deviceId,
-      //           point.tagId,
-      //           point.value,
-      //         );
-      //       }
-      //     }
-      //   });
-      // }
-    }
+    // Create service manager
+    final serviceManager = ServiceManager(
+      channelManager: channelManager,
+    );
 
     // Start HTTP API server
+    final httpServer = HttpApiServer(
+      serviceManager: serviceManager,
+      port: httpPort,
+    );
     print('Starting HTTP API server...');
     unawaited(httpServer.start());
 
-    print('AnyIO Service started successfully with isolated channels!');
+    print('AnyIO Service started successfully!');
     print('Available endpoints:');
     print('  GET  http://localhost:$httpPort/health');
     print('  GET  http://localhost:$httpPort/devices');
     print('  GET  http://localhost:$httpPort/devices/{deviceId}');
+    print('  GET  http://localhost:$httpPort/devices/{deviceId}/status');
     print('  GET  http://localhost:$httpPort/devices/{deviceId}/values');
-    print('  GET  http://localhost:$httpPort/devices/{deviceId}/points');
+    print('  GET  http://localhost:$httpPort/devices/{deviceId}/variables');
     print(
-      '  GET  http://localhost:$httpPort/devices/{deviceId}/points/{pointId}',
+      '  GET  http://localhost:$httpPort/devices/{deviceId}/variables/{variableId}',
     );
-  print('  POST http://localhost:$httpPort/devices/{deviceId}/points/{pointId}');
-  print('       Body: JSON scalar or JSON value (e.g., true, 123, "text")');
     print(
-      '  GET  http://localhost:$httpPort/history/{deviceId}[/{pointId}]?start=...&end=...&limit=...',
+      '  POST http://localhost:$httpPort/devices/{deviceId}/variables/{variableId}',
     );
-    print('  GET  http://localhost:$httpPort/stats');
     print('');
-    print('Channel isolation: ENABLED (channels run in separate isolates)');
-    print('Auto-restart: ENABLED (max 3 attempts, 5s delay)');
-    print('Channel restart stats: ${serviceManager.getRestartStats()}');
+    print('Channel isolation: via per-adapter isolates');
 
     // Handle shutdown gracefully
     // ProcessSignal.sigint.watch().listen((_) async {
@@ -150,14 +124,8 @@ Future<void> main(List<String> args) async {
     print('Failed to start service: $e');
     print('Stack trace: $stackTrace');
 
-    // Cleanup on error
-    try {
-      await httpServer.stop();
-      await dataCollector.stop();
-      await serviceManager.stop();
-    } on Exception catch (cleanupError) {
-      print('Error during cleanup: $cleanupError');
-    }
+    // Cleanup on error (best-effort)
+    // No resources to dispose here as server may not have started
 
     exit(1);
   }

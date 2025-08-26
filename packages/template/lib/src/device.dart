@@ -4,7 +4,7 @@ abstract class Device {
   String get deviceId;
 
   Map<String, Object?> get values;
-  List<PointInfo> get points;
+  List<VariableInfo> get points;
 
   Object? read(String tagId);
   Stream<Object?> listen(String tagId);

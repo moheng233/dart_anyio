@@ -1,16 +1,20 @@
-import 'package:anyio_service/src/channel_manager.dart';
-import 'package:anyio_service/src/transport_manager.dart';
-import 'package:anyio_service/src/transports/tcp.dart';
+// This is a dev-only CLI to dump JSON Schemas for config validation.
+// ignore_for_file: directives_ordering
+
+import 'dart:io';
+
+import 'package:anyio_adapter_modbus/src/template.dart';
 import 'package:anyio_template/service.dart';
 import 'package:dart_mappable_schema/json_schema.dart';
 
-import 'package:anyio_adapter_modbus/adapter.dart';
-
 void main(List<String> args) {
-  final channels = ChannelManagerImpl()
-    ..registerFactory(ChannelFactoryForModbus());
-  final transports = TransportManagerImpl()
-    ..register(TransportFactoryForTcpImpl());
+  // Ensure mappers are initialized so schemas include discriminators
+  ServiceOptionMapper.ensureInitialized();
+  TemplateOptionMapper.ensureInitialized();
+  ChannelOptionForModbusMapper.ensureInitialized();
+  ChannelTemplateForModbusMapper.ensureInitialized();
 
-  print(ServiceOptionMapper.ensureInitialized().toJsonSchema().toJson());
+  stdout.writeln(
+    ServiceOptionMapper.ensureInitialized().toJsonSchema().toJson(),
+  );
 }
