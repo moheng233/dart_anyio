@@ -7,15 +7,5 @@ devices:
       unit_id: 1
       transport:
         type: tcp
-        host: "127.0.0.1"
-        port: 8888
-  - name: "test2"
-    template: "test"
-    channel:
-      type: "modbus"
-      is_rtu: false
-      unit_id: 2
-      transport:
-        type: tcp
-        host: "127.0.0.1"
-        port: 8888
+        host: "52.82.99.207"
+        port: 20003

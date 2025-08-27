@@ -4,12 +4,13 @@ import 'dart:isolate';
 
 import 'package:anyio_template/service.dart';
 import 'package:dart_mappable/dart_mappable.dart';
+import 'package:logging/logging.dart';
 
-import 'action_manager.dart';
-import 'variable_manager.dart';
+import 'manager/action_manager.dart';
+import 'manager/variable_manager.dart';
 
-final class ChannelManagerImpl {
-  ChannelManagerImpl({
+final class DataGateway {
+  DataGateway({
     required this.deviceAdapter,
     required this.adapterIsolate,
     required this.adapterC2S,
@@ -115,11 +116,6 @@ final class ChannelManagerImpl {
   ActionInfo? getActionInfo(String deviceId, String actionId) =>
       actions.getActionInfo(deviceId, actionId);
 
-  /// 等待指定适配器完成握手
-  Future<void> waitAdapterReady(String adapterId) {
-    return (_ready[adapterId] ??= Completer<void>()).future;
-  }
-
   /// 资源释放：取消端口订阅并关闭聚合流
   Future<void> dispose() async {
     for (final sub in _c2sSubs.values) {
@@ -131,9 +127,7 @@ final class ChannelManagerImpl {
 
   /// 等待所有适配器完成握手
   Future<void> waitAllAdaptersReady() async {
-    for (final adapterId in adapterC2S.keys) {
-      await waitAdapterReady(adapterId);
-    }
+    await Future.wait([for (final wait in _ready.values) wait.future]);
   }
 
   void _routeWrite(DeviceBaseEvent event) {
@@ -152,7 +146,7 @@ final class ChannelManagerImpl {
     port.send(event);
   }
 
-  static Future<ChannelManagerImpl> initialize(
+  static Future<DataGateway> initialize(
     ServiceOption service,
     Map<String, TemplateOption> templates, {
     Logger? logger,
@@ -219,11 +213,9 @@ final class ChannelManagerImpl {
       adapterIsolate[element.key] = isolate;
 
       logger?.info('Spawn [${element.key}] Adapter Isolate End');
-
-      // 订阅与握手处理已在 ChannelManagerImpl 内部完成，这里不再重复订阅。
     }
 
-    final mgr = ChannelManagerImpl(
+    final gateway = DataGateway(
       deviceAdapter: HashMap.from(deviceForAdapter),
       adapterIsolate: HashMap.from(adapterIsolate),
       adapterC2S: HashMap.from(adapterC2S),
@@ -234,10 +226,10 @@ final class ChannelManagerImpl {
 
     // 等待所有适配器握手完成，保持与旧逻辑一致的时序
     logger?.info('Waiting adapters ready ...');
-    await mgr.waitAllAdaptersReady();
+    await gateway.waitAllAdaptersReady();
     logger?.info('All adapters ready');
 
-    return mgr;
+    return gateway;
   }
 
   static void

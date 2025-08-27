@@ -1,2 +1,3 @@
-// Re-export Modbus adapter isolate handler
 export 'src/protocol.dart';
+export 'src/template.dart'
+    show ChannelOptionForModbusMapper, ChannelTemplateForModbusMapper;

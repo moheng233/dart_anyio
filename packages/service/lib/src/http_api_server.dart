@@ -115,11 +115,11 @@ class HttpApiServer {
   void _handleDevicesGet(HttpRequest request, List<String> segments) {
     if (segments.length == 1) {
       // GET /devices - list all devices
-      final devices = serviceManager.channelManager.deviceIds
+      final devices = serviceManager.gateway.deviceIds
           .map(
             (id) => {
               'deviceId': id,
-              'online': serviceManager.channelManager.getDeviceOnline(id),
+              'online': serviceManager.gateway.getDeviceOnline(id),
             },
           )
           .toList();
@@ -131,7 +131,7 @@ class HttpApiServer {
     if (segments.length >= 2) {
       final deviceId = segments[1];
       // 存在性校验：目前 deviceIds 为来源
-      if (!serviceManager.channelManager.deviceIds.contains(deviceId)) {
+      if (!serviceManager.gateway.deviceIds.contains(deviceId)) {
         _sendError(
           request.response,
           HttpStatus.notFound,
@@ -144,8 +144,8 @@ class HttpApiServer {
         // GET /devices/{deviceId} - get device info and values
         _sendJson(request.response, {
           'deviceId': deviceId,
-          'online': serviceManager.channelManager.getDeviceOnline(deviceId),
-          'values': serviceManager.channelManager.readAllValues(deviceId),
+          'online': serviceManager.gateway.getDeviceOnline(deviceId),
+          'values': serviceManager.gateway.readAllValues(deviceId),
         });
         return;
       }
@@ -157,7 +157,7 @@ class HttpApiServer {
             // GET /devices/{deviceId}/status - get device online status
             _sendJson(request.response, {
               'deviceId': deviceId,
-              'online': serviceManager.channelManager.getDeviceOnline(deviceId),
+              'online': serviceManager.gateway.getDeviceOnline(deviceId),
               'timestamp': DateTime.now().toIso8601String(),
             });
             return;
@@ -165,12 +165,12 @@ class HttpApiServer {
             // GET /devices/{deviceId}/values - get all values
             _sendJson(
               request.response,
-              serviceManager.channelManager.readAllValues(deviceId),
+              serviceManager.gateway.readAllValues(deviceId),
             );
             return;
           case 'variables':
             // GET /devices/{deviceId}/variables - variable definitions
-            final defs = serviceManager.channelManager.getVariableDefinitions(
+            final defs = serviceManager.gateway.getVariableDefinitions(
               deviceId,
             );
             final variables = defs.entries
@@ -188,7 +188,7 @@ class HttpApiServer {
             return;
           case 'actions':
             // GET /devices/{deviceId}/actions - action definitions
-            final defs = serviceManager.channelManager.getActionDefinitions(
+            final defs = serviceManager.gateway.getActionDefinitions(
               deviceId,
             );
             final actions = defs.entries
@@ -217,11 +217,11 @@ class HttpApiServer {
       if (segments.length == 4 && segments[2] == 'variables') {
         final variableId = segments[3];
         // GET /devices/{deviceId}/variables/{variableId} - get specific variable info and value
-        final info = serviceManager.channelManager.getVariableInfo(
+        final info = serviceManager.gateway.getVariableInfo(
           deviceId,
           variableId,
         );
-        final value = serviceManager.channelManager.readValue(
+        final value = serviceManager.gateway.readValue(
           deviceId,
           variableId,
         );
@@ -246,7 +246,7 @@ class HttpApiServer {
       if (segments.length == 4 && segments[2] == 'actions') {
         final actionId = segments[3];
         // GET /devices/{deviceId}/actions/{actionId} - get action info
-        final info = serviceManager.channelManager.getActionInfo(
+        final info = serviceManager.gateway.getActionInfo(
           deviceId,
           actionId,
         );
@@ -327,10 +327,10 @@ class HttpApiServer {
     }
 
     // Send current value immediately
-    sendEvent(serviceManager.channelManager.readValue(deviceId, variableId));
+    sendEvent(serviceManager.gateway.readValue(deviceId, variableId));
 
     // Subscribe to variable updates
-    final sub = serviceManager.channelManager
+    final sub = serviceManager.gateway
         .listenValue(deviceId, variableId)
         .listen(sendEvent, onError: (_) {});
 
@@ -377,10 +377,10 @@ class HttpApiServer {
     }
 
     // Send current status immediately
-    sendEvent(online: serviceManager.channelManager.getDeviceOnline(deviceId));
+    sendEvent(online: serviceManager.gateway.getDeviceOnline(deviceId));
 
     // Subscribe to status change events
-    final sub = serviceManager.channelManager
+    final sub = serviceManager.gateway
         .listenEvent<ChannelDeviceStatusEvent>()
         .where((e) => e.deviceId == deviceId)
         .listen((e) => sendEvent(online: e.online), onError: (_) {});
@@ -407,7 +407,7 @@ class HttpApiServer {
   ) async {
     if (segments.length >= 2 && segments[0] == 'devices') {
       final deviceId = segments[1];
-      if (!serviceManager.channelManager.deviceIds.contains(deviceId)) {
+      if (!serviceManager.gateway.deviceIds.contains(deviceId)) {
         _sendError(
           request.response,
           HttpStatus.notFound,
@@ -440,7 +440,7 @@ class HttpApiServer {
         }
 
         try {
-          final success = await serviceManager.channelManager.invokeAction(
+          final success = await serviceManager.gateway.invokeAction(
             deviceId,
             variableId,
             value,
@@ -484,7 +484,7 @@ class HttpApiServer {
         }
 
         try {
-          final success = await serviceManager.channelManager.invokeAction(
+          final success = await serviceManager.gateway.invokeAction(
             deviceId,
             actionId,
             value,

@@ -16,6 +16,8 @@ dependencies:
   checked_yaml: ^2.0.4
   dart_mappable: ^4.6.0
   dart_mappable_schema: ^0.1.0
+  http: ^1.5.0
+  logging: ^1.3.0
   meta: ^1.17.0
   path: ^1.9.1
 

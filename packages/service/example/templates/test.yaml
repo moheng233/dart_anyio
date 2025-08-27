@@ -1,26 +1,179 @@
 info:
-  name: test
+  name: vmeter
   version: "1.0"
 meta: {}
 points:
-  n1: { type: value }
-  n2: { type: enum, values: { 关机: 0, 开机: 1 } }
-actions:
-  n2: { type: value }
+  # Status and control
+  remote_state: { type: value, description: "Remote state" }
+  tick: { type: value, description: "Tick counter" }
+  pollstate: { type: value, description: "Poll state" }
+  pollave: { type: value, description: "Poll average voltage", unit: "V" }
+  pollmax: { type: value, description: "Poll max voltage", unit: "V" }
+  mqtt_state: { type: value, description: "MQTT state" }
+  mqtt_fifoused: { type: value, description: "MQTT FIFO used" }
+
+  # Power measurements
+  activep: { type: value, description: "Active power", unit: "kW" }
+  inactivep: { type: value, description: "Inactive power", unit: "kW" }
+  apparentp: { type: value, description: "Apparent power", unit: "kVA" }
+  pf: { type: value, description: "Power factor" }
+  activedem: { type: value, description: "Active demand", unit: "kW" }
+
+  # Energy measurements
+  comactivee:
+    { type: value, description: "Combined active energy", unit: "kWh" }
+  posactivee:
+    { type: value, description: "Positive active energy", unit: "kWh" }
+  negactivee:
+    { type: value, description: "Negative active energy", unit: "kWh" }
+
+  # Voltage measurements
+  va: { type: value, description: "Voltage A", unit: "V" }
+  vb: { type: value, description: "Voltage B", unit: "V" }
+  vc: { type: value, description: "Voltage C", unit: "V" }
+
+  # Current measurements
+  ia: { type: value, description: "Current A", unit: "A" }
+  ib: { type: value, description: "Current B", unit: "A" }
+  ic: { type: value, description: "Current C", unit: "A" }
+
+  # Frequency
+  f: { type: value, description: "Frequency", unit: "Hz" }
+
+  # Sharp/Peak/Flat/Valley energy
+  posactivee_sharp:
+    { type: value, description: "Positive active energy sharp", unit: "kWh" }
+  posactivee_peake:
+    { type: value, description: "Positive active energy peak", unit: "kWh" }
+  posactivee_flate:
+    { type: value, description: "Positive active energy flat", unit: "kWh" }
+  posactivee_valleye:
+    { type: value, description: "Positive active energy valley", unit: "kWh" }
+  negactivee_sharp:
+    { type: value, description: "Negative active energy sharp", unit: "kWh" }
+  negactivee_peake:
+    { type: value, description: "Negative active energy peak", unit: "kWh" }
+  negactivee_flate:
+    { type: value, description: "Negative active energy flat", unit: "kWh" }
+  negactivee_valleye:
+    { type: value, description: "Negative active energy valley", unit: "kWh" }
+
+  # Phase power
+  activep_ap: { type: value, description: "Active power phase A", unit: "W" }
+  activep_bp: { type: value, description: "Active power phase B", unit: "W" }
+  activep_cp: { type: value, description: "Active power phase C", unit: "W" }
+
+actions: {}
 template:
   type: modbus
   polls:
     - begin: 0
-      length: 1
+      length: 70
       function: 3
       interval_ms: 1000
       mapping:
-        - { to: n1, offset: 0, length: 1, endian: abcd }
-    - begin: 1
-      length: 1
-      function: 3
-      interval_ms: 1500
-      mapping:
-        - { to: n2, offset: 0, length: 1, endian: abcd }
-  pushs:
-    - { from: n2, function: 3, begin: 1 }
+        # Status registers
+        - { to: remote_state, offset: 4, length: 1, endian: abcd, type: uint }
+        - { to: tick, offset: 6, length: 1, endian: abcd, type: uint }
+        - { to: pollstate, offset: 9, length: 1, endian: abcd, type: uint }
+        - { to: pollave, offset: 10, length: 1, endian: abcd, type: float }
+        - { to: pollmax, offset: 11, length: 1, endian: abcd, type: float }
+        - { to: mqtt_state, offset: 12, length: 1, endian: abcd, type: uint }
+        - { to: mqtt_fifoused, offset: 13, length: 1, endian: abcd, type: uint }
+
+        # Power measurements (32-bit values)
+        - { to: activep, offset: 20, length: 2, endian: abcd, type: float }
+        - { to: inactivep, offset: 22, length: 2, endian: abcd, type: float }
+        - { to: pf, offset: 24, length: 1, endian: abcd, type: float }
+        - { to: activedem, offset: 25, length: 2, endian: abcd, type: float }
+
+        # Energy measurements (32-bit values)
+        - { to: comactivee, offset: 27, length: 2, endian: abcd, type: uint }
+        - { to: posactivee, offset: 29, length: 2, endian: abcd, type: uint }
+        - { to: negactivee, offset: 31, length: 2, endian: abcd, type: uint }
+
+        # Voltage measurements
+        - { to: va, offset: 33, length: 1, endian: abcd, type: float }
+        - { to: vb, offset: 34, length: 1, endian: abcd, type: float }
+        - { to: vc, offset: 35, length: 1, endian: abcd, type: float }
+
+        # Current measurements (16-bit values)
+        - { to: ia, offset: 36, length: 1, endian: abcd, type: float }
+        - { to: ib, offset: 37, length: 1, endian: abcd, type: float }
+        - { to: ic, offset: 38, length: 1, endian: abcd, type: float }
+
+        # Frequency
+        - { to: f, offset: 39, length: 1, endian: abcd, type: float }
+
+        # Sharp/Peak/Flat/Valley energy (32-bit values)
+        - {
+            to: posactivee_sharp,
+            offset: 40,
+            length: 2,
+            endian: abcd,
+            type: float,
+          }
+        - {
+            to: posactivee_peake,
+            offset: 42,
+            length: 2,
+            endian: abcd,
+            type: float,
+          }
+        - {
+            to: posactivee_flate,
+            offset: 44,
+            length: 2,
+            endian: abcd,
+            type: float,
+          }
+        - {
+            to: posactivee_valleye,
+            offset: 46,
+            length: 2,
+            endian: abcd,
+            type: float,
+          }
+        - {
+            to: negactivee_sharp,
+            offset: 48,
+            length: 2,
+            endian: abcd,
+            type: float,
+          }
+        - {
+            to: negactivee_peake,
+            offset: 50,
+            length: 2,
+            endian: abcd,
+            type: float,
+          }
+        - {
+            to: negactivee_flate,
+            offset: 52,
+            length: 2,
+            endian: abcd,
+            type: float,
+          }
+        - {
+            to: negactivee_valleye,
+            offset: 54,
+            length: 2,
+            endian: abcd,
+            type: float,
+          }
+
+        # Phase power (32-bit values)
+        - { to: activep_ap, offset: 56, length: 2, endian: abcd, type: uint }
+        - { to: activep_bp, offset: 58, length: 2, endian: abcd, type: uint }
+        - { to: activep_cp, offset: 60, length: 2, endian: abcd, type: uint }
+
+        # Current 32-bit values (alternative)
+        - { to: ia, offset: 62, length: 2, endian: abcd, type: uint }
+        - { to: ib, offset: 64, length: 2, endian: abcd, type: uint }
+        - { to: ic, offset: 66, length: 2, endian: abcd, type: uint }
+
+        # Apparent power (32-bit)
+        - { to: apparentp, offset: 68, length: 2, endian: abcd, type: uint }
+
+  pushs: []

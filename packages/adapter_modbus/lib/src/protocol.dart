@@ -163,6 +163,9 @@ class _ModbusAdapterRunner {
       if (transport == null) return;
 
       final socket = await _connectSocket(transport);
+
+      socket.setOption(SocketOption.tcpNoDelay, true);
+
       final client = ModbusClient(socket, socket, isRtu: isRtu);
 
       _wireSocketMonitor(socket, key);
@@ -200,12 +203,11 @@ class _ModbusAdapterRunner {
         session.open();
 
         // 上报设备恢复在线
-        readCtrl.add(ChannelDeviceStatusEvent(id, true));
-
-        // Report reconnect success
-        readCtrl.add(
-          ChannelPerformanceCountEvent(id, 'conn.reconnect.success', 1),
-        );
+        readCtrl
+          ..add(ChannelDeviceStatusEvent(id, true))
+          ..add(
+            ChannelPerformanceCountEvent(id, 'conn.reconnect.success', 1),
+          );
 
         final end = DateTime.now();
         readCtrl.add(

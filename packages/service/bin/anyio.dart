@@ -3,9 +3,9 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:anyio_adapter_modbus/src/protocol.dart';
-import 'package:anyio_adapter_modbus/src/template.dart';
+import 'package:anyio_adapter_modbus/adapter.dart';
 import 'package:anyio_service/service.dart';
+import 'package:anyio_service/src/database/impls/questdb.dart';
 import 'package:anyio_template/service.dart';
 
 Future<void> main(List<String> args) async {
@@ -36,18 +36,12 @@ Future<void> main(List<String> args) async {
   print('HTTP API port: $httpPort');
 
   // Register channel factory (Modbus) with new handler + mappers
-  ChannelManagerImpl.registerFactory<
-    ChannelOptionForModbus,
-    ChannelTemplateForModbus
-  >(
+  DataGateway.registerFactory(
     'modbus',
     modbusChannelFactoryHandler,
     channelOptionMapper: ChannelOptionForModbusMapper.ensureInitialized(),
     templateOptionMapper: ChannelTemplateForModbusMapper.ensureInitialized(),
   );
-
-  final logger = LoggingManager.instance
-    ..initialize(logger: ConsoleLogger(globalLevel: LogLevel.debug));
 
   try {
     // Load configuration and templates
@@ -62,12 +56,48 @@ Future<void> main(List<String> args) async {
 
     // Initialize channels (spawn adapter isolates and sessions)
     print('Starting channels...');
-    final channelManager = await ChannelManagerImpl.initialize(
+    final channelManager = await DataGateway.initialize(
       serviceConfig,
       templates,
     );
 
-    channelManager.listenEvent<ChannelPerformanceEvent>().listen(print);
+    // Initialize QuestDB clients
+    print('Initializing QuestDB clients...');
+
+    // Create QuestDB database implementation using factory
+    final questDbImpl = await RecordDatabaseQuestDBImpl.create(
+      serverIp: 'localhost',
+      variableDefinitions: <String, Map<String, VariableInfo>>{},
+      actionDefinitions: <String, Map<String, ActionInfo>>{},
+    );
+
+    // Initialize database tables
+    print('Initializing database tables...');
+    await questDbImpl.initialize();
+
+    // Listen to performance events and store them in QuestDB
+    channelManager.listenEvent<ChannelPerformanceEvent>().listen((event) async {
+      try {
+        if (event is ChannelPerformanceCountEvent) {
+          if (event.count != null) {
+            await questDbImpl.addPerformanceCountEvent(
+              event.eventName,
+              event.count!,
+            );
+          }
+        } else if (event is ChannelPerformanceTimeEvent) {
+          if (event.startTime != null && event.endTime != null) {
+            await questDbImpl.addPerformanceRangeEvent(
+              event.eventName,
+              event.startTime!,
+              event.endTime!,
+            );
+          }
+        }
+      } on Exception catch (e) {
+        print('Failed to store performance event: $e');
+      }
+    });
 
     // Create service manager
     final serviceManager = ServiceManager(
