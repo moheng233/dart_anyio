@@ -15,6 +15,6 @@ void main(List<String> args) {
   ChannelTemplateForModbusMapper.ensureInitialized();
 
   stdout.writeln(
-    ServiceOptionMapper.ensureInitialized().toJsonSchema().toJson(),
+    TemplateOptionMapper.ensureInitialized().toJsonSchema().toJson(),
   );
 }

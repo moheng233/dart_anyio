@@ -1,6 +1,9 @@
+# yaml-language-server: $schema=schema/device.schema.json
 devices:
-  - name: "test1"
-    template: "test"
+  - name: "grid_meter"
+    template: "remote_meter"
+    meta:
+      type: "meter"
     channel:
       type: "modbus"
       is_rtu: false

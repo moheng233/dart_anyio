@@ -27,9 +27,6 @@
                 "channel": {
                     "$ref": "#/definitions/ChannelOptionBase"
                 },
-                "transport_option": {
-                    "$ref": "#/definitions/TransportOptionBase"
-                },
                 "display_name": {
                     "oneOf": [
                         {
@@ -49,49 +46,7 @@
             "required": [
                 "name",
                 "template",
-                "channel",
-                "transport_option"
-            ],
-            "additionalProperties": false
-        },
-        "TransportOptionBase": {
-            "type": "object",
-            "properties": {
-                "type": {
-                    "type": "string",
-                    "enum": [
-                        "tcp"
-                    ]
-                }
-            },
-            "required": [
-                "type"
-            ],
-            "additionalProperties": true,
-            "oneOf": [
-                {
-                    "$ref": "#/definitions/TransportOptionForTcp"
-                }
-            ]
-        },
-        "TransportOptionForTcp": {
-            "type": "object",
-            "properties": {
-                "host": {
-                    "type": "string"
-                },
-                "port": {
-                    "type": "integer"
-                },
-                "type": {
-                    "type": "string",
-                    "const": "tcp"
-                }
-            },
-            "required": [
-                "host",
-                "port",
-                "type"
+                "channel"
             ],
             "additionalProperties": false
         },
@@ -124,6 +79,9 @@
                 "unit_id": {
                     "type": "integer"
                 },
+                "transport": {
+                    "$ref": "#/definitions/ModbusTransportOption"
+                },
                 "type": {
                     "type": "string",
                     "const": "modbus"
@@ -132,6 +90,69 @@
             "required": [
                 "is_rtu",
                 "unit_id",
+                "transport",
+                "type"
+            ],
+            "additionalProperties": false
+        },
+        "ModbusTransportOption": {
+            "type": "object",
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "tcp",
+                        "unixsocket"
+                    ]
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "additionalProperties": true,
+            "oneOf": [
+                {
+                    "$ref": "#/definitions/ModbusTcpOption"
+                },
+                {
+                    "$ref": "#/definitions/ModbusUnixSocketOption"
+                }
+            ]
+        },
+        "ModbusUnixSocketOption": {
+            "type": "object",
+            "properties": {
+                "path": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string",
+                    "const": "unixsocket"
+                }
+            },
+            "required": [
+                "path",
+                "type"
+            ],
+            "additionalProperties": false
+        },
+        "ModbusTcpOption": {
+            "type": "object",
+            "properties": {
+                "host": {
+                    "type": "string"
+                },
+                "port": {
+                    "type": "integer"
+                },
+                "type": {
+                    "type": "string",
+                    "const": "tcp"
+                }
+            },
+            "required": [
+                "host",
+                "port",
                 "type"
             ],
             "additionalProperties": false

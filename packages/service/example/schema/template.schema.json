@@ -9,11 +9,18 @@
         "template": {
             "$ref": "#/definitions/ChannelTemplateBase"
         },
-        "points": {
+        "variables": {
             "type": "object",
             "properties": {},
             "additionalProperties": {
-                "$ref": "#/definitions/PointInfo"
+                "$ref": "#/definitions/VariableInfo"
+            }
+        },
+        "actions": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {
+                "$ref": "#/definitions/ActionInfo"
             }
         },
         "meta": {
@@ -25,21 +32,14 @@
     "required": [
         "info",
         "template",
-        "points"
+        "variables",
+        "actions"
     ],
     "additionalProperties": false,
     "definitions": {
-        "PointInfo": {
+        "ActionInfo": {
             "type": "object",
             "properties": {
-                "access": {
-                    "type": "string",
-                    "enum": [
-                        "r",
-                        "rw",
-                        "w"
-                    ]
-                },
                 "display_name": {
                     "oneOf": [
                         {
@@ -74,14 +74,14 @@
             "additionalProperties": true,
             "oneOf": [
                 {
-                    "$ref": "#/definitions/PointInfoForValue"
+                    "$ref": "#/definitions/ActionInfoForValue"
                 },
                 {
-                    "$ref": "#/definitions/PointInfoForEnum"
+                    "$ref": "#/definitions/ActionInfoForEnum"
                 }
             ]
         },
-        "PointInfoForEnum": {
+        "ActionInfoForEnum": {
             "type": "object",
             "properties": {
                 "values": {
@@ -90,14 +90,6 @@
                     "additionalProperties": {
                         "type": "number"
                     }
-                },
-                "access": {
-                    "type": "string",
-                    "enum": [
-                        "r",
-                        "rw",
-                        "w"
-                    ]
                 },
                 "display_name": {
                     "oneOf": [
@@ -130,19 +122,9 @@
             ],
             "additionalProperties": false
         },
-        "PointInfoForValue": {
+        "ActionInfoForValue": {
             "type": "object",
             "properties": {
-                "read": {
-                    "oneOf": [
-                        {
-                            "type": "string"
-                        },
-                        {
-                            "type": "null"
-                        }
-                    ]
-                },
                 "write": {
                     "oneOf": [
                         {
@@ -153,12 +135,142 @@
                         }
                     ]
                 },
-                "access": {
+                "display_name": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "detailed": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "type": {
+                    "type": "string",
+                    "const": "value"
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "additionalProperties": false
+        },
+        "VariableInfo": {
+            "type": "object",
+            "properties": {
+                "display_name": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "detailed": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "unit": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "type": {
                     "type": "string",
                     "enum": [
-                        "r",
-                        "rw",
-                        "w"
+                        "value",
+                        "enum"
+                    ]
+                }
+            },
+            "required": [
+                "type"
+            ],
+            "additionalProperties": true,
+            "oneOf": [
+                {
+                    "$ref": "#/definitions/VariableInfoForValue"
+                },
+                {
+                    "$ref": "#/definitions/VariableInfoForEnum"
+                }
+            ]
+        },
+        "VariableInfoForEnum": {
+            "type": "object",
+            "properties": {
+                "values": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": {
+                        "type": "number"
+                    }
+                },
+                "display_name": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "detailed": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
+                },
+                "type": {
+                    "type": "string",
+                    "const": "enum"
+                }
+            },
+            "required": [
+                "values",
+                "type"
+            ],
+            "additionalProperties": false
+        },
+        "VariableInfoForValue": {
+            "type": "object",
+            "properties": {
+                "read": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
                     ]
                 },
                 "display_name": {
@@ -220,6 +332,12 @@
                         "$ref": "#/definitions/ModbusPoll"
                     }
                 },
+                "pushs": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/ModbusPush"
+                    }
+                },
                 "type": {
                     "type": "string",
                     "const": "modbus"
@@ -228,6 +346,52 @@
             "required": [
                 "polls",
                 "type"
+            ],
+            "additionalProperties": false
+        },
+        "ModbusPush": {
+            "type": "object",
+            "properties": {
+                "from": {
+                    "type": "string"
+                },
+                "function": {
+                    "type": "integer"
+                },
+                "begin": {
+                    "type": "integer"
+                },
+                "scale": {
+                    "type": "number",
+                    "default": 1.0
+                },
+                "length": {
+                    "type": "integer",
+                    "default": 1
+                },
+                "endian": {
+                    "type": "string",
+                    "enum": [
+                        "abcd",
+                        "dcba",
+                        "badc",
+                        "cdab"
+                    ]
+                },
+                "type": {
+                    "type": "string",
+                    "enum": [
+                        "bool",
+                        "int",
+                        "uint",
+                        "float"
+                    ]
+                }
+            },
+            "required": [
+                "from",
+                "function",
+                "begin"
             ],
             "additionalProperties": false
         },
@@ -251,6 +415,16 @@
                     "items": {
                         "$ref": "#/definitions/ModbusPoint"
                     }
+                },
+                "display_name": {
+                    "oneOf": [
+                        {
+                            "type": "string"
+                        },
+                        {
+                            "type": "null"
+                        }
+                    ]
                 }
             },
             "required": [
@@ -295,14 +469,6 @@
                         "int",
                         "uint",
                         "float"
-                    ]
-                },
-                "access": {
-                    "type": "string",
-                    "enum": [
-                        "r",
-                        "rw",
-                        "w"
                     ]
                 }
             },

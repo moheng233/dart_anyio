@@ -21,14 +21,16 @@ final class TemplateOption with TemplateOptionMappable {
   const TemplateOption({
     required this.info,
     required this.template,
-    required this.points,
+    required this.variables,
+    required this.actions,
     this.meta = const {},
   });
 
   final ChannelTempateInfo info;
   final Map<String, Object?> meta;
   final ChannelTemplateBase template;
-  final Map<String, VariableInfo> points;
+  final Map<String, VariableInfo> variables;
+  final Map<String, ActionInfo> actions;
 }
 
 @MappableClass(discriminatorKey: 'type')

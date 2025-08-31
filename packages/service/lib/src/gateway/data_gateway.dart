@@ -186,7 +186,7 @@ final class DataGateway {
 
       // 记录定义
       variableDefinitions[device.name] = HashMap<String, VariableInfo>.from(
-        template.points,
+        template.variables,
       );
       actionDefinitions[device.name] = HashMap<String, ActionInfo>();
     }

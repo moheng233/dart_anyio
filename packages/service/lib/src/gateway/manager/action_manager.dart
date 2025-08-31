@@ -14,8 +14,8 @@ final class ActionManager {
   Stream<ChannelBaseEvent>? _read;
   StreamSubscription<ChannelBaseEvent>? _sub;
 
-  // key -> queue of completers
-  final _pending = HashMap<String, List<Completer<bool>>>();
+  // key -> completer
+  final _pending = HashMap<String, Completer<bool>>();
 
   // 动作定义：deviceId -> (actionId -> ActionInfo)
   final HashMap<String, HashMap<String, ActionInfo>> _definitions;
@@ -29,11 +29,10 @@ final class ActionManager {
   void _onEvent(ChannelBaseEvent event) {
     if (event is ChannelWritedEvent) {
       final key = _key(event.deviceId, event.tagId);
-      final q = _pending[key];
-      if (q != null && q.isNotEmpty) {
-        final completer = q.removeAt(0);
-        if (!completer.isCompleted) completer.complete(event.success);
-        if (q.isEmpty) _pending.remove(key);
+      final completer = _pending[key];
+      if (completer != null && !completer.isCompleted) {
+        completer.complete(event.success);
+        _pending.remove(key);
       }
     }
   }
@@ -52,7 +51,12 @@ final class ActionManager {
 
     final key = _key(deviceId, actionId);
     final completer = Completer<bool>();
-    _pending.putIfAbsent(key, () => <Completer<bool>>[]).add(completer);
+    // 如果有之前的，取消它
+    final previous = _pending[key];
+    if (previous != null && !previous.isCompleted) {
+      previous.complete(false);
+    }
+    _pending[key] = completer;
 
     // 发送写事件
     _route(DeviceActionInvokeEvent(deviceId, actionId, value));
@@ -61,12 +65,7 @@ final class ActionManager {
     return completer.future.timeout(
       timeout,
       onTimeout: () {
-        // 从队列中移除自己
-        final list = _pending[key];
-        if (list != null) {
-          list.remove(completer);
-          if (list.isEmpty) _pending.remove(key);
-        }
+        _pending.remove(key);
         return false;
       },
     );
@@ -98,10 +97,8 @@ final class ActionManager {
     _sub = null;
     _read = null;
     // 失败所有挂起请求
-    for (final list in _pending.values) {
-      for (final c in list) {
-        if (!c.isCompleted) c.complete(false);
-      }
+    for (final completer in _pending.values) {
+      if (!completer.isCompleted) completer.complete(false);
     }
     _pending.clear();
     _definitions.clear();

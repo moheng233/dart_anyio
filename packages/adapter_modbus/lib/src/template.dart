@@ -29,11 +29,11 @@ final class ChannelTemplateForModbus extends ChannelTemplateBase
     with ChannelTemplateForModbusMappable {
   const ChannelTemplateForModbus({
     required this.polls,
-    this.pushes = const [],
+    this.pushs = const [],
   });
 
   final List<ModbusPoll> polls;
-  final List<ModbusPush> pushes;
+  final List<ModbusPush> pushs;
 }
 
 @MappableEnum(caseStyle: CaseStyle.lowerCase)

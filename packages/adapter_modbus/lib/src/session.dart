@@ -93,7 +93,7 @@ final class ChannelSessionForModbus {
       return;
     }
 
-  final updates = <Variable>[];
+    final updates = <Variable>[];
 
     if (poll.function == 1 || poll.function == 2) {
       final view = reads.cast<bool>();
@@ -136,7 +136,13 @@ final class ChannelSessionForModbus {
               int() => view.getFloat32Swap(offset, endian: endian, swap: swap),
             },
           };
-          updates.add(Variable(deviceId, point.to, value));
+          updates.add(
+            Variable(
+              deviceId,
+              point.to,
+              value is num ? value * point.scale + point.offset : value,
+            ),
+          );
         } on Exception catch (_) {
           updates.add(Variable(deviceId, point.to, null));
         }
@@ -164,7 +170,7 @@ final class ChannelSessionForModbus {
 
     final startTime = DateTime.now();
 
-    final targetPush = templateOption.pushes.firstWhere(
+    final targetPush = templateOption.pushs.firstWhere(
       (element) => element.from == event.actionId,
     );
 
@@ -192,7 +198,7 @@ final class ChannelSessionForModbus {
           readController.add(
             ChannelWritedEvent(
               deviceId,
-        event.actionId,
+              event.actionId,
               false,
               'function ${targetPush.function} is read-only',
             ),
@@ -202,7 +208,7 @@ final class ChannelSessionForModbus {
       readController.add(
         ChannelWritedEvent(
           deviceId,
-      event.actionId,
+          event.actionId,
           false,
           'exception: ${e.runtimeType}',
         ),
@@ -275,7 +281,7 @@ final class ChannelSessionForModbus {
               throw UnsupportedError('Unsupported int length: $length');
             }
           }
-  case VariableType.uint:
+        case VariableType.uint:
           {
             final intVal = toInt(value);
             if (length == 1) {
@@ -305,7 +311,7 @@ final class ChannelSessionForModbus {
               throw UnsupportedError('Unsupported uint length: $length');
             }
           }
-  case VariableType.float:
+        case VariableType.float:
           {
             final numVal = toNum(value).toDouble();
             if (length == 4) {

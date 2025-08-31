@@ -4,9 +4,20 @@ import 'dart:isolate';
 
 import 'package:anyio_modbus/modbus_client.dart';
 import 'package:anyio_template/service.dart';
+import 'package:anyio_template/tcp_connection_manager.dart';
 
 import 'session.dart';
 import 'template.dart';
+
+// Constants
+const String _modbusS2cPortName = 'modbus_s2c';
+const String _connectionTypeTcp = 'tcp';
+const String _connectionTypeUnix = 'unix';
+const String _connectionTypeUnknown = 'unknown';
+const String _performanceEventReconnectAttempt = 'conn.reconnect.attempt';
+const String _performanceEventReconnectSuccess = 'conn.reconnect.success';
+const String _performanceEventReconnectFail = 'conn.reconnect.fail';
+const String _performanceEventReconnect = 'conn.reconnect';
 
 typedef _ModbusClientEntry = ({
   ModbusClient? client,
@@ -22,10 +33,22 @@ typedef _SessionSpec = ({
   ChannelTemplateForModbus templateOption,
 });
 
+typedef _ConnectionInfo = ({
+  ModbusTransportOption transport,
+  bool isRtu,
+  Set<String> deviceIds,
+});
+
 class _ModbusAdapterRunner {
   _ModbusAdapterRunner(this.devices, this.c2sPort)
     : readCtrl = StreamController<ChannelBaseEvent>(sync: true),
-      writeCtrl = StreamController<DeviceBaseEvent>.broadcast(sync: true);
+      writeCtrl = StreamController<DeviceBaseEvent>.broadcast(sync: true) {
+    tcpManager = TcpConnectionManager(
+      onConnectionStateChanged: _onConnectionStateChanged,
+      onConnectionEstablished: _onConnectionEstablished,
+      onConnectionLost: _onConnectionLost,
+    );
+  }
 
   final List<ChannelOptionGroup> devices;
   final SendPort c2sPort;
@@ -34,280 +57,283 @@ class _ModbusAdapterRunner {
   final StreamController<ChannelBaseEvent> readCtrl;
   final StreamController<DeviceBaseEvent> writeCtrl;
 
+  // TCP connection manager - initialized in constructor
+  late final TcpConnectionManager tcpManager;
+
   // Pooling and session state
   final sessions = <String, ChannelSessionForModbus>{};
   final clients = <String, _ModbusClientEntry>{};
   final connDevices = <String, Set<String>>{}; // connectionKey -> deviceIds
-  final reconnectAttempts = <String, int>{};
   final sessionSpecs = <String, _SessionSpec>{};
-  final nextAttemptAt = <String, DateTime>{};
-  final Set<String> pendingReconnect = <String>{};
-  Timer? _reconnectTicker;
-  static const Duration _tickInterval = Duration(seconds: 1);
+  final connectionInfos = <String, _ConnectionInfo>{};
 
   String _clientKey(ChannelOptionForModbus ch) {
     final t = ch.transport;
-    if (t is ModbusTcpOption) return 'tcp:${t.host}:${t.port}';
-    if (t is ModbusUnixSocketOption) return 'unix:${t.path}';
-    return 'unknown';
+    if (t is ModbusTcpOption) return '$_connectionTypeTcp:${t.host}:${t.port}';
+    if (t is ModbusUnixSocketOption) return '$_connectionTypeUnix:${t.path}';
+    return _connectionTypeUnknown;
   }
 
-  Future<Socket> _connectSocket(ModbusTransportOption t) async {
-    if (t is ModbusTcpOption) {
-      return Socket.connect(
-        InternetAddress(t.host, type: InternetAddressType.IPv4),
-        t.port,
-      );
+  TcpConnectionConfig _transportToConfig(ModbusTransportOption transport) {
+    if (transport is ModbusTcpOption) {
+      return TcpConnectionConfig.tcp(transport.host, transport.port);
     }
-    if (t is ModbusUnixSocketOption) {
-      return Socket.connect(
-        InternetAddress(t.path, type: InternetAddressType.unix),
-        0,
-      );
-    }
-    throw UnsupportedError('Unsupported transport');
+    if (transport is ModbusUnixSocketOption) {
+      return TcpConnectionConfig.unix(transport.path);
+    } 
+    throw UnsupportedError('Unsupported transport: ${transport.runtimeType}');
   }
 
   void _notifyConnectionDown(String key, Object? error) {
     final ids = connDevices[key];
     if (ids == null || ids.isEmpty) return;
+
     for (final id in ids) {
       sessions[id]?.stop();
-      // 上报设备离线
       readCtrl.add(ChannelDeviceStatusEvent(id, false));
     }
   }
 
-  void _wireSocketMonitor(Socket socket, String key) {
-    unawaited(
-      Future<void>(() async {
-        try {
-          await socket.done;
-          _notifyConnectionDown(key, null);
-        } on Object catch (e) {
-          _notifyConnectionDown(key, e);
-        }
-        _enqueueReconnect(key);
-      }),
+  void _reportPerformanceEvent(String deviceId, String eventName, int count) {
+    readCtrl.add(ChannelPerformanceCountEvent(deviceId, eventName, count));
+  }
+
+  void _reportPerformanceTime(
+    String deviceId,
+    String eventName,
+    Duration diffTime,
+    DateTime startTime,
+    DateTime endTime,
+  ) {
+    readCtrl.add(
+      ChannelPerformanceTimeEvent(
+        deviceId,
+        eventName,
+        diffTime: diffTime,
+        startTime: startTime,
+        endTime: endTime,
+      ),
     );
   }
 
-  void _enqueueReconnect(String key) {
-    pendingReconnect.add(key);
-    nextAttemptAt.putIfAbsent(key, DateTime.now);
-    _startTicker();
-  }
-
-  void _startTicker() {
-    _reconnectTicker ??= Timer.periodic(
-      _tickInterval,
-      (_) => _onReconnectTick(),
-    );
-  }
-
-  Duration _backoffDelay(int n) {
-    if (n <= 1) return const Duration(seconds: 1);
-    if (n == 2) return const Duration(seconds: 2);
-    if (n == 3) return const Duration(seconds: 5);
-    if (n == 4) return const Duration(seconds: 10);
-    return const Duration(seconds: 30);
-  }
-
-  void _onReconnectTick() {
-    if (pendingReconnect.isEmpty) return;
-    final now = DateTime.now();
-    final keys = List<String>.from(pendingReconnect);
-    for (final key in keys) {
-      final pooled = clients[key];
-      if (pooled == null) {
-        pendingReconnect.remove(key);
-        nextAttemptAt.remove(key);
-        continue;
-      }
-      if (pooled.reconnecting) continue;
-      final nextAt = nextAttemptAt[key] ?? now;
-      if (nextAt.isAfter(now)) continue;
-      _attemptReconnect(key);
-    }
-    if (pendingReconnect.isEmpty && _reconnectTicker != null) {
-      _reconnectTicker!.cancel();
-      _reconnectTicker = null;
+  // TCP Connection Manager Callbacks
+  void _onConnectionStateChanged(
+    String connectionKey,
+    TcpConnectionState state,
+  ) {
+    switch (state) {
+      case TcpConnectionState.connected:
+        _handleConnectionEstablished(connectionKey);
+      case TcpConnectionState.disconnected:
+        _notifyConnectionDown(connectionKey, null);
+      case TcpConnectionState.reconnecting:
+        _reportReconnectAttempt(connectionKey);
+      case TcpConnectionState.connecting:
+        // No specific action needed for connecting state
+        break;
     }
   }
 
-  Future<void> _attemptReconnect(String key) async {
-    final pooled = clients[key];
-    if (pooled == null) return;
-    clients[key] = (
-      client: pooled.client,
-      refCount: pooled.refCount,
-      socket: pooled.socket,
-      transport: pooled.transport,
-      isRtu: pooled.isRtu,
-      reconnecting: true,
-    );
+  void _onConnectionEstablished(String connectionKey, Socket socket) {
+    _handleConnectionEstablishedWithSocket(connectionKey, socket);
+  }
 
-    final start = DateTime.now();
+  void _onConnectionLost(String connectionKey, Object? error) {
+    _notifyConnectionDown(connectionKey, error);
+    _reportReconnectFailure(connectionKey);
+  }
+
+  void _reportReconnectAttempt(String connectionKey) {
+    final deviceIds = connDevices[connectionKey] ?? const <String>{};
+    for (final deviceId in deviceIds) {
+      _reportPerformanceEvent(deviceId, _performanceEventReconnectAttempt, 1);
+    }
+  }
+
+  void _reportReconnectFailure(String connectionKey) {
+    final deviceIds = connDevices[connectionKey] ?? const <String>{};
+    for (final deviceId in deviceIds) {
+      _reportPerformanceEvent(deviceId, _performanceEventReconnectFail, 1);
+    }
+  }
+
+  void _handleConnectionEstablished(String connectionKey) {
+    final connInfo = connectionInfos[connectionKey];
+    if (connInfo == null) return;
+
+    final socket = tcpManager.getSocket(connectionKey);
+    if (socket == null) return;
+
+    _handleConnectionEstablishedWithSocket(connectionKey, socket);
+  }
+
+  void _handleConnectionEstablishedWithSocket(
+    String connectionKey,
+    Socket socket,
+  ) {
+    final connInfo = connectionInfos[connectionKey];
+    if (connInfo == null) return;
+
+    final startTime = DateTime.now();
+
     try {
-      // Report reconnect attempt count
-      final attemptNo = (reconnectAttempts[key] ?? 0) + 1;
-      final attemptIds = connDevices[key] ?? const <String>{};
-      for (final id in attemptIds) {
-        readCtrl.add(
-          ChannelPerformanceCountEvent(id, 'conn.reconnect.attempt', attemptNo),
-        );
-      }
+      _createModbusClient(connectionKey, socket, connInfo, startTime);
+    } catch (error, stackTrace) {
+      // Handle client creation failure - log error but don't crash
+      print('Failed to create Modbus client for $connectionKey: $error');
+      print('Stack trace: $stackTrace');
+    }
+  }
 
-      final transport = clients[key]?.transport;
-      final isRtu = clients[key]?.isRtu ?? false;
-      if (transport == null) return;
+  void _createModbusClient(
+    String connectionKey,
+    Socket socket,
+    _ConnectionInfo connInfo,
+    DateTime startTime,
+  ) {
+    // Create Modbus client
+    final client = ModbusClient(socket, socket, isRtu: connInfo.isRtu);
 
-      final socket = await _connectSocket(transport);
+    // Store client
+    clients[connectionKey] = (
+      client: client,
+      refCount: connInfo.deviceIds.length,
+      socket: socket,
+      transport: connInfo.transport,
+      isRtu: connInfo.isRtu,
+      reconnecting: false,
+    );
 
-      socket.setOption(SocketOption.tcpNoDelay, true);
+    // Create sessions for all devices on this connection
+    for (final deviceId in connInfo.deviceIds) {
+      _createDeviceSession(deviceId, client, startTime);
+    }
+  }
 
-      final client = ModbusClient(socket, socket, isRtu: isRtu);
+  void _createDeviceSession(
+    String deviceId,
+    ModbusClient client,
+    DateTime startTime,
+  ) {
+    final old = sessions[deviceId];
+    if (old != null) {
+      old.stop();
+    }
 
-      _wireSocketMonitor(socket, key);
+    final spec = sessionSpecs[deviceId];
+    if (spec == null) return;
 
-      final cur = clients[key];
-      if (cur == null) return;
-      clients[key] = (
-        client: client,
-        refCount: cur.refCount,
-        socket: socket,
-        transport: cur.transport,
-        isRtu: cur.isRtu,
-        reconnecting: false,
+    final session = ChannelSessionForModbus(
+      deviceId,
+      write: writeCtrl.stream.where(
+        (e) => e is DeviceActionInvokeEvent && e.deviceId == deviceId,
+      ),
+      client: client,
+      channelOption: spec.channelOption,
+      templateOption: spec.templateOption,
+    );
+
+    sessions[deviceId] = session;
+    session.read.listen(readCtrl.add);
+    session.open();
+
+    // Report device online and success metrics
+    _reportDeviceOnline(deviceId, startTime);
+  }
+
+  void _reportDeviceOnline(String deviceId, DateTime startTime) {
+    final endTime = DateTime.now();
+
+    readCtrl
+      ..add(ChannelDeviceStatusEvent(deviceId, true))
+      ..add(
+        ChannelPerformanceCountEvent(
+          deviceId,
+          _performanceEventReconnectSuccess,
+          1,
+        ),
       );
 
-      final ids = connDevices[key] ?? const <String>{};
-      for (final id in ids) {
-        final old = sessions[id];
-        if (old != null) {
-          old.stop();
-        }
-        final spec = sessionSpecs[id];
-        if (spec == null) continue;
-        final session = ChannelSessionForModbus(
-          id,
-          write: writeCtrl.stream.where(
-            (e) => e is DeviceActionInvokeEvent && e.deviceId == id,
-          ),
-          client: client,
-          channelOption: spec.channelOption,
-          templateOption: spec.templateOption,
-        );
-        sessions[id] = session;
-        session.read.listen(readCtrl.add);
-        session.open();
-
-        // 上报设备恢复在线
-        readCtrl
-          ..add(ChannelDeviceStatusEvent(id, true))
-          ..add(
-            ChannelPerformanceCountEvent(id, 'conn.reconnect.success', 1),
-          );
-
-        final end = DateTime.now();
-        readCtrl.add(
-          ChannelPerformanceTimeEvent(
-            id,
-            'conn.reconnect',
-            diffTime: end.difference(start),
-            startTime: start,
-            endTime: end,
-          ),
-        );
-      }
-
-      reconnectAttempts[key] = 0;
-      pendingReconnect.remove(key);
-      nextAttemptAt.remove(key);
-    } on Exception {
-      final n = (reconnectAttempts[key] ?? 0) + 1;
-      reconnectAttempts[key] = n;
-      final ids = connDevices[key] ?? const <String>{};
-      for (final id in ids) {
-        readCtrl.add(
-          ChannelPerformanceCountEvent(id, 'conn.reconnect.fail', 1),
-        );
-      }
-      pendingReconnect.add(key);
-      nextAttemptAt[key] = DateTime.now().add(_backoffDelay(n));
-      final cur = clients[key];
-      if (cur != null) {
-        clients[key] = (
-          client: cur.client,
-          refCount: cur.refCount,
-          socket: cur.socket,
-          transport: cur.transport,
-          isRtu: cur.isRtu,
-          reconnecting: false,
-        );
-      }
-    }
+    _reportPerformanceTime(
+      deviceId,
+      _performanceEventReconnect,
+      endTime.difference(startTime),
+      startTime,
+      endTime,
+    );
   }
 
   Future<void> run() async {
+    _setupCommunication();
+    _registerDevices();
+    _startConnections();
+
+    // Keep isolate alive
+    await Completer<void>().future;
+  }
+
+  void _setupCommunication() {
     // Pipe read to service isolate
     readCtrl.stream.listen(c2sPort.send);
 
     // Create S2C port for receiving device events from service and announce ready
-    final s2cPort = ReceivePort('modbus_s2c');
+    final s2cPort = ReceivePort(_modbusS2cPortName);
     c2sPort.send(ChannelReadyEvent(s2cPort.sendPort));
-    // We filter only DeviceBaseEvent into write stream; a direct tearoff would
-    // lose this filtering, so keep the small closure intentionally.
-    // ignore: unnecessary_lambdas
+
+    // Filter and forward device events to write stream
     s2cPort.listen((msg) {
       if (msg is DeviceBaseEvent) writeCtrl.add(msg);
     });
+  }
 
-    // Register all devices by connection key and schedule connection attempts
-    for (final d in devices) {
-      final deviceId = d.deviceId;
+  void _registerDevices() {
+    for (final device in devices) {
       try {
-        final ch = d.channel as ChannelOptionForModbus;
-        final tp = d.template as ChannelTemplateForModbus;
-
-        final key = _clientKey(ch);
-        // Record device under connection key
-        (connDevices[key] ??= <String>{}).add(deviceId);
-        sessionSpecs[deviceId] = (channelOption: ch, templateOption: tp);
-
-        if (clients.containsKey(key)) {
-          // Increase ref count for existing pooled client
-          final cur = clients[key]!;
-          clients[key] = (
-            client: cur.client,
-            refCount: cur.refCount + 1,
-            socket: cur.socket,
-            transport: cur.transport,
-            isRtu: cur.isRtu,
-            reconnecting: cur.reconnecting,
-          );
-        } else {
-          // Create placeholder entry (no socket/client yet) and enqueue reconnect
-          clients[key] = (
-            client: null,
-            refCount: 1,
-            socket: null,
-            transport: ch.transport,
-            isRtu: ch.isRtu,
-            reconnecting: false,
-          );
-          _enqueueReconnect(key);
-        }
-
-        // 初始状态：未连接，标记离线（直到首次连接成功时上报在线）
-        readCtrl.add(ChannelDeviceStatusEvent(deviceId, false));
-      } on Exception catch (_) {
-        // Keep handler running regardless of individual device config errors.
+        _registerDevice(device);
+      } on Object catch (error, stackTrace) {
+        // Keep handler running regardless of individual device config errors
+        print('Failed to register device ${device.deviceId}: $error');
+        print('Stack trace: $stackTrace');
       }
     }
+  }
 
-    // keep isolate alive
-    await Completer<void>().future;
+  void _registerDevice(ChannelOptionGroup device) {
+    final deviceId = device.deviceId;
+    final ch = device.channel as ChannelOptionForModbus;
+    final tp = device.template as ChannelTemplateForModbus;
+
+    final key = _clientKey(ch);
+
+    // Record device under connection key
+    (connDevices[key] ??= <String>{}).add(deviceId);
+    sessionSpecs[deviceId] = (channelOption: ch, templateOption: tp);
+
+    // Store connection info for this key
+    connectionInfos.putIfAbsent(
+      key,
+      () => (
+        transport: ch.transport,
+        isRtu: ch.isRtu,
+        deviceIds: <String>{},
+      ),
+    );
+    connectionInfos[key]!.deviceIds.add(deviceId);
+
+    // Initial state: disconnected, report offline
+    readCtrl.add(ChannelDeviceStatusEvent(deviceId, false));
+  }
+
+  void _startConnections() {
+    for (final entry in connectionInfos.entries) {
+      final config = _transportToConfig(entry.value.transport);
+      tcpManager.addConnection(entry.key, config);
+    }
+  }
+
+  /// Cleanup resources
+  void dispose() {
+    tcpManager.stop();
   }
 }
 

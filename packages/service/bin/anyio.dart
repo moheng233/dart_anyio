@@ -61,37 +61,38 @@ Future<void> main(List<String> args) async {
       templates,
     );
 
-    // Initialize QuestDB clients
-    print('Initializing QuestDB clients...');
+    // // Initialize QuestDB clients
+    // print('Initializing QuestDB clients...');
 
-    // Create QuestDB database implementation using factory
-    final questDbImpl = await RecordDatabaseQuestDBImpl.create(
-      serverIp: 'localhost',
-      variableDefinitions: <String, Map<String, VariableInfo>>{},
-      actionDefinitions: <String, Map<String, ActionInfo>>{},
-    );
+    // // Create QuestDB database implementation using factory
+    // final questDbImpl = await RecordDatabaseQuestDBImpl.create(
+    //   serverIp: 'localhost',
+    //   variableDefinitions: <String, Map<String, VariableInfo>>{},
+    //   actionDefinitions: <String, Map<String, ActionInfo>>{},
+    // );
 
-    // Initialize database tables
-    print('Initializing database tables...');
-    await questDbImpl.initialize();
+    // // Initialize database tables
+    // print('Initializing database tables...');
+    // await questDbImpl.initialize();
 
     // Listen to performance events and store them in QuestDB
     channelManager.listenEvent<ChannelPerformanceEvent>().listen((event) async {
       try {
         if (event is ChannelPerformanceCountEvent) {
           if (event.count != null) {
-            await questDbImpl.addPerformanceCountEvent(
-              event.eventName,
-              event.count!,
-            );
+            // await questDbImpl.addPerformanceCountEvent(
+            //   event.eventName,
+            //   event.count!,
+            // );
           }
         } else if (event is ChannelPerformanceTimeEvent) {
           if (event.startTime != null && event.endTime != null) {
-            await questDbImpl.addPerformanceRangeEvent(
-              event.eventName,
-              event.startTime!,
-              event.endTime!,
-            );
+            // await questDbImpl.addPerformanceRangeEvent(
+            //   event.eventName,
+            //   event.startTime!,
+            //   event.endTime!,
+            // );
+            print(event);
           }
         }
       } on Exception catch (e) {

@@ -1,8 +1,6 @@
 @MappableLib(caseStyle: CaseStyle.snakeCase)
 library;
 
-import 'dart:typed_data';
-
 import 'package:dart_mappable/dart_mappable.dart';
 import 'package:meta/meta.dart';
 
@@ -41,13 +39,11 @@ class ActionId with ActionIdMappable {
 
 @MappableClass(discriminatorKey: 'type')
 sealed class VariableInfo with VariableInfoMappable {
-  const VariableInfo({
-    this.displayName,
-    this.detailed,
-  });
+  const VariableInfo({this.displayName, this.detailed, this.unit});
 
   final String? displayName;
   final String? detailed;
+  final String? unit;
 }
 
 @MappableClass(discriminatorKey: 'type')
