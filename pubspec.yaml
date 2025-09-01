@@ -14,6 +14,7 @@ workspace:
   - packages/template
   - packages/service
   - packages/adapter_modbus
+  - packages/adapter_can
 
 dev_dependencies:
   melos: ^7.0.0-dev

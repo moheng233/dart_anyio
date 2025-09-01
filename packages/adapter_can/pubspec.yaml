@@ -1,0 +1,41 @@
+name: anyio_adapter_modbus
+description: "AnyIO"
+publish_to: "none"
+# repository: https://github.com/my_org/my_repo
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.8.0
+
+resolution: workspace
+
+dev_dependencies:
+  build_runner: any
+  dart_mappable_builder: any
+  ffigen: ^19.1.0
+  freezed: any
+  json_serializable: any
+  very_good_analysis: any
+dependencies:
+  anyio_modbus: ^0.1.0
+  anyio_template: ^1.0.0
+  code_assets: ^0.19.6
+  dart_mappable: ^4.6.0
+  ffi: ^2.1.4
+  hooks: ^0.20.1
+  meta: ^1.17.0
+
+ffigen:
+  output: "lib/src/generated_bindings.dart"
+  headers:
+    entry-points:
+      - src/usbcan2/ControlCAN.h
+  ffi-native:
+    asset-id: "package:anyio_adapter_modbus/anyio_adapter_modbus.dart"
+  functions:
+    rename:
+      "VCI_(.*)": "$1"
+  structs:
+    rename:
+      "_VCI_(.*)": "$1"
